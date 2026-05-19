@@ -1,0 +1,75 @@
+{
+  "expo": {
+    "name": "Brand Gallery Shopping",
+    "slug": "user-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/app-icon.jpeg",
+    "scheme": "userapp",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/app-icon.jpeg",
+        "backgroundColor": "#FFFFFF"
+      },
+      "package": "com.slliman.userapp",
+      "googleServicesFile": "./google-services.json",
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
+    },
+    "edgeToEdgeEnabled": true,
+    "predictiveBackGestureEnabled": false,
+    "usesCleartextTraffic": true,
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/app-icon.jpeg"
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysPermission": "Allow BrandGalley to access your location for delivery."
+        }
+      ],
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/app-icon.jpeg",
+          "resizeMode": "cover",
+          "backgroundColor": "#ffffff",
+          "dark": {
+            "image": "./assets/images/app-icon.jpeg",
+            "backgroundColor": "#000000"
+          }
+        }
+      ],
+      "expo-secure-store",
+      "expo-web-browser",
+      "expo-sqlite",
+      [
+        "onesignal-expo-plugin",
+        {
+          "mode": "development"
+        }
+      ]
+    ],
+    "extra": {
+      "oneSignalAppId": "1e89f5fe-bc90-4462-b4ab-f03a3e561c8d",
+      "router": {},
+      "eas": {
+        "projectId": "a1dc12ab-309d-46eb-9255-d0c09d926b29"
+      }
+    },
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}
