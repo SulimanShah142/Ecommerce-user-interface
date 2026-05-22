@@ -13,13 +13,15 @@ import { useLanguage } from '@/Contexts/LanguageContext';
 import CachedImage from '@/components/CachedImage';
 
 const { width } = Dimensions.get('window');
+// Premium 2-column calculation spacing accounts for side edge insets
+const PRODUCT_CARD_WIDTH = (width - 42) / 2; 
 
 const SkeletonCard = () => (
   <View style={styles.productCard}>
-    <View style={[styles.productImage, { backgroundColor: '#F5F5F5' }]} />
+    <View style={[styles.imageContainer, { backgroundColor: '#F8F8F8' }]} />
     <View style={styles.productInfo}>
-      <View style={{ height: 12, backgroundColor: '#EEE', width: '80%', marginBottom: 6 }} />
-      <View style={{ height: 14, backgroundColor: '#EEE', width: '40%' }} />
+      <View style={{ height: 10, backgroundColor: '#EEEEEE', width: '80%', marginBottom: 8 }} />
+      <View style={{ height: 12, backgroundColor: '#EEEEEE', width: '40%' }} />
     </View>
   </View>
 );
@@ -32,7 +34,7 @@ export default function HomePage() {
   const [categories, setCategories] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [settings, setSettings] = useState<any>(null);
-  const [displayLimit, setDisplayLimit] = useState(6);
+  const [displayLimit, setDisplayLimit] = useState(12); // Elevated count for richer browsing layouts
   const [refreshing, setRefreshing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -46,7 +48,6 @@ export default function HomePage() {
     try {
       if (isInitialLoad) setIsLoading(true);
       
-      // 1. Load Local Everything (Fast UI)
       const [localCats, localProds, localSettings] = await Promise.all([
         loadCategoriesLocal(),
         loadProductsLocal(),
@@ -60,7 +61,6 @@ export default function HomePage() {
         if (localProds?.length > 0) setIsLoading(false);
       }
 
-      // 2. Background Sync
       if (await isOnline().catch(() => false)) {
         const syncSuccess = await syncRemoteCatalog();
         if (syncSuccess) {
@@ -97,15 +97,25 @@ export default function HomePage() {
     return () => { isMounted.current = false; };
   }, []);
 
-  // Calculation Logic using DB Settings
+  // Inside your User App product listing page file block
+  
   const getPrices = (usdPrice: string) => {
-    const rate = parseFloat(settings?.usdToAfnRate || '68');
+    // 🎯 THE FIX: Change fallback exchange rate to '65' to match Admin server nodes perfectly
+    const rate = parseFloat(settings?.usdToAfnRate || '65');
     const profit = parseFloat(settings?.profitPercentage || '20');
+    
+    // Base localized calculation conversion
     const base = parseFloat(usdPrice || '0') * rate;
     
+    // Standard retail formula matching your Hono worker analytics output precisely
+    const currentPriceCalculated = Math.round(base + (base * (profit / 100)));
+    
+    // Old price anchor marked up by an additional static 15% clearance cue index
+    const oldPriceCalculated = Math.round(base + (base * ((profit + 15) / 100)));
+    
     return {
-      current: Math.round(base * (1 + profit / 100)).toLocaleString(),
-      old: Math.round(base * (1 + (profit + 15) / 100)).toLocaleString()
+      current: currentPriceCalculated.toLocaleString(),
+      old: oldPriceCalculated.toLocaleString()
     };
   };
 
@@ -117,21 +127,21 @@ export default function HomePage() {
         key={item.id} 
         style={styles.productCard} 
         onPress={() => router.push(`/product/${item.id}`)}
-        activeOpacity={0.9}
+        activeOpacity={0.85}
       >
         <View style={styles.imageContainer}>
           <CachedImage remoteUrl={item.imageUrl} style={styles.productImage} />
-          <View style={styles.badge}>
+          <View style={[styles.badge, isRTL ? { right: 8 } : { left: 8 }]}>
             <Text style={styles.badgeText}>NEW</Text>
           </View>
-          <TouchableOpacity style={styles.wishlistBtn}>
-            <Ionicons name="heart-outline" size={18} color="#000" />
+          <TouchableOpacity style={[styles.wishlistBtn, isRTL ? { left: 8 } : { right: 8 }]} activeOpacity={0.7}>
+            <Ionicons name="heart-outline" size={16} color="#000" />
           </TouchableOpacity>
         </View>
         
         <View style={styles.productInfo}>
-          <Text style={[styles.productName, isRTL && styles.rtlText]} numberOfLines={1}>
-            {item.name}
+          <Text style={[styles.productName, isRTL && { textAlign: 'right' }]} numberOfLines={1}>
+            {item.name?.toUpperCase()}
           </Text>
           <View style={[styles.priceRow, isRTL && { flexDirection: 'row-reverse' }]}>
             <Text style={styles.productPrice}>AFN {current}</Text>
@@ -144,15 +154,17 @@ export default function HomePage() {
 
   return (
     <View style={styles.container}>
+      {/* MINIMAL SHARP TOP BAR */}
       <View style={styles.topBar}>
-        <View style={styles.searchContainer}>
-          <Ionicons name="search-outline" size={18} color="#000" />
+        <View style={[styles.searchContainer, isRTL && { flexDirection: 'row-reverse' }]}>
+          <Ionicons name="search-outline" size={16} color="#666" />
           <TextInput
-            placeholder="Search on SHEIN"
+            placeholder={t('searchProduct') || "SEARCH BRAND GALLERY..."}
             placeholderTextColor="#999"
-            style={styles.searchInput}
+            style={[styles.searchInput, isRTL && { textAlign: 'right', marginRight: 10, marginLeft: 0 }]}
             value={searchQuery}
             onChangeText={setSearchQuery}
+            autoCapitalize="characters"
           />
         </View>
       </View>
@@ -161,7 +173,13 @@ export default function HomePage() {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => handleLoadData(false)} tintColor="#000" />}
       >
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.catScroll}>
+        {/* REFINED HORIZONTAL STORY CIRCLES */}
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false} 
+          contentContainerStyle={[styles.catScrollContent, isRTL && { flexDirection: 'row-reverse' }]}
+          style={styles.catScroll}
+        >
           {categories.map((cat) => (
             <TouchableOpacity key={cat.id} style={styles.catCircleItem} onPress={() => router.push(`/categories/${cat.id}`)}>
               <View style={styles.circle}>
@@ -172,16 +190,17 @@ export default function HomePage() {
           ))}
         </ScrollView>
 
-        <Text style={styles.sectionTitle}>JUST FOR YOU</Text>
+        <Text style={styles.sectionTitle}>{t('justForYou')?.toUpperCase() || 'JUST FOR YOU'}</Text>
         
-        <View style={styles.productGrid}>
+        {/* PORTRAIT GRID FRAMEWORK */}
+        <View style={[styles.productGrid, isRTL && { flexDirection: 'row-reverse' }]}>
           {isLoading && products.length === 0 ? (
             Array(6).fill(0).map((_, i) => <SkeletonCard key={i} />)
           ) : (
             filteredProducts.map((item) => renderProduct(item))
           )}
         </View>
-        <View style={{ height: 100 }} />
+        <View style={{ height: 60 }} />
       </ScrollView>
     </View>
   );
@@ -193,45 +212,52 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF' 
   },
   topBar: { 
-    paddingTop: 50, 
+    paddingTop: 54, 
     paddingHorizontal: 16, 
-    paddingBottom: 12,
-    backgroundColor: '#FFF'
+    paddingBottom: 14,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F5F5F5'
   },
   searchContainer: { 
     flexDirection: 'row', 
     alignItems: 'center', 
-    backgroundColor: '#F7F7F7', // Slightly softer grey
-    borderRadius: 0, // SHEIN uses sharp edges for search
-    paddingHorizontal: 15, 
-    height: 36,
+    backgroundColor: '#FAFAFA', 
+    borderRadius: 4, 
+    paddingHorizontal: 12, 
+    height: 40,
     borderWidth: 1,
-    borderColor: '#EEEEEE'
+    borderColor: '#EAEAEA'
   },
   searchInput: { 
     flex: 1, 
     marginLeft: 10, 
-    fontSize: 12, 
-    fontWeight: '400',
-    letterSpacing: 0.5 
+    fontSize: 11, 
+    fontWeight: '500',
+    letterSpacing: 1,
+    color: '#000000'
   },
   catScroll: { 
-    paddingVertical: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F2F2F2'
+    backgroundColor: '#FFFFFF'
+  },
+  catScrollContent: {
+    paddingLeft: 16,
+    paddingRight: 6,
+    paddingVertical: 18
   },
   catCircleItem: { 
     alignItems: 'center', 
-    width: 80 
+    marginRight: 14,
+    width: 64
   },
   circle: { 
-    width: 58, 
-    height: 58, 
-    borderRadius: 29, 
-    backgroundColor: '#FFF', 
+    width: 60, 
+    height: 60, 
+    borderRadius: 30, 
+    backgroundColor: '#FAFAFA', 
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#F2F2F2' 
+    borderColor: '#EEEEEE' 
   },
   circleImg: { 
     width: '100%', 
@@ -239,89 +265,102 @@ const styles = StyleSheet.create({
     resizeMode: 'cover' 
   },
   catLabel: { 
-    fontSize: 10, 
-    marginTop: 6, 
+    fontSize: 9, 
+    marginTop: 8, 
     textAlign: 'center', 
-    fontWeight: '500',
-    textTransform: 'uppercase', // Minimalist aesthetic
-    color: '#222'
+    fontWeight: '600',
+    textTransform: 'uppercase', 
+    color: '#111111',
+    letterSpacing: 0.5
   },
   sectionTitle: { 
-    fontSize: 15, 
-    fontWeight: '700', 
-    letterSpacing: 2, // Spacing is key for "Lux" feel
+    fontSize: 13, 
+    fontWeight: '800', 
+    letterSpacing: 3, 
     textAlign: 'center', 
-    marginVertical: 25,
+    marginTop: 28,
+    marginBottom: 20,
     textTransform: 'uppercase',
-    color: '#000'
+    color: '#000000'
   },
-  productGrid: { 
-    flexDirection: 'row', 
-    flexWrap: 'wrap', 
-    paddingHorizontal: 4 // Tighter grid
+  productGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 16,
+    justifyContent: 'space-between'
   },
-  productCard: { 
-    width: (width / 2) - 8, 
-    marginHorizontal: 4, 
-    marginBottom: 20 
+  productCard: {
+    width: PRODUCT_CARD_WIDTH,
+    marginBottom: 24,
+    backgroundColor: '#FFFFFF'
   },
   imageContainer: {
-    position: 'relative',
     width: '100%',
+    aspectRatio: 3 / 4, // 🎯 High-end 3:4 portrait fashion ratio
+    backgroundColor: '#FAFAFA',
+    position: 'relative',
+    overflow: 'hidden',
+    borderRadius: 2
   },
   productImage: { 
     width: '100%', 
-    height: 250, // Longer aspect ratio looks more like fashion editorial
-    backgroundColor: '#F9F9F9' 
-  },
-  wishlistBtn: {
-    position: 'absolute',
-    bottom: 10,
-    right: 10,
-    backgroundColor: 'rgba(255,255,255,0.8)',
-    padding: 6,
-    borderRadius: 20
+    height: '100%',
+    resizeMode: 'cover'
   },
   badge: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    backgroundColor: '#000',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    top: 8,
+    backgroundColor: '#000000',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 1
   },
   badgeText: {
-    color: '#FFF',
-    fontSize: 9,
-    fontWeight: 'bold'
+    color: '#FFFFFF',
+    fontSize: 8,
+    fontWeight: '800',
+    letterSpacing: 0.5
+  },
+  wishlistBtn: {
+    position: 'absolute',
+    top: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2
   },
   productInfo: { 
-    paddingVertical: 10,
+    paddingTop: 10,
     paddingHorizontal: 2
   },
   productName: { 
-    fontSize: 11, 
-    color: '#666', // Lighter name to emphasize price
-    lineHeight: 14 
+    fontSize: 10, 
+    color: '#222222', 
+    fontWeight: '500',
+    letterSpacing: 0.8,
+    marginBottom: 4
   },
   priceRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 4
+    gap: 6
   },
   productPrice: { 
-    fontSize: 14, 
-    fontWeight: 'bold', 
-    color: '#000' // Using Black instead of Orange for a "High Fashion" minimal look
+    fontSize: 11, 
+    color: '#000000', 
+    fontWeight: '700' 
   },
-  oldPrice: {
-    fontSize: 11,
-    color: '#999',
+  oldPrice: { 
+    fontSize: 9, 
+    color: '#999999', 
     textDecorationLine: 'line-through',
-    marginLeft: 6,
     fontWeight: '400'
-  },
-  rtlText: { 
-    textAlign: 'right' 
   }
 });

@@ -1,95 +1,194 @@
-import { useEffect, useState } from 'react';
-import { Stack, useRouter, useSegments } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import * as SplashScreen from 'expo-splash-screen';
-import 'react-native-reanimated';
-
+import { Tabs, useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { StyleSheet, TouchableOpacity, View, Text, Platform, Image, Dimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LanguageProvider, useLanguage } from '../Contexts/LanguageContext'; 
+import { CartProvider, useCart } from '../Contexts/CartContext';
+import { useEffect, useMemo } from 'react';
 import { authClient } from '@/lib/auth-client';
-import { CartProvider } from '@/Contexts/CartContext';
-import { LanguageProvider } from '@/Contexts/LanguageContext';
-import { initOfflineDb } from '@/lib/offline';
-import { initOneSignal } from '@/lib/notiifcations';
+import { OneSignal } from 'react-native-onesignal';
 
-// 1. Keep this at the VERY top level, outside the function
-SplashScreen.preventAutoHideAsync().catch(() => {
-  /* handle error */
-});
-
-export default function RootLayout() {
-  const segments = useSegments();
+// 🎯 PART 1: THE CHILD CONTENT (Safely consumes context fields)
+function RootLayoutContent() {
+  const { t, isRTL } = useLanguage(); 
   const router = useRouter();
-  const { data: session, isPending } = authClient.useSession();
-  const [appIsReady, setAppIsReady] = useState(false);
+  const { data: session } = authClient.useSession();
+  const { width } = Dimensions.get('window');
+  const insets = useSafeAreaInsets();
 
-  // 2. Load Services
+  // 1. ADD INITIALIZE EFFECT HERE (Runs immediately on component mount)
   useEffect(() => {
-    initOneSignal();
-    initOfflineDb();
+    // Replace with your true OneSignal App ID string
+    OneSignal.initialize("YOUR_ONESIGNAL_APP_ID"); 
   }, []);
 
-  // 3. Wait for assets and timer
+  // 2. Active Session Watcher Pipeline
   useEffect(() => {
-    async function prepare() {
+    if (session?.user?.id) {
       try {
-        // Simulation of loading assets/data
-        await new Promise(resolve => setTimeout(resolve, 2000)); 
+        console.log("Linking User to OneSignal:", session.user.id);
+        OneSignal.login(session.user.id);
       } catch (e) {
-        console.warn(e);
-      } finally {
-        // Signal that the app is ready to render
-        setAppIsReady(true);
+        console.warn("OneSignal login deferred: SDK not ready yet");
       }
     }
-    prepare();
-  }, []);
+  }, [session?.user?.id]);
 
-  // 4. HIDE SPLASH ONLY WHEN READY
-  // We use a separate effect so the UI renders at least once before hiding
-  useEffect(() => {
-    if (appIsReady) {
-      SplashScreen.hideAsync();
-    }
-  }, [appIsReady]);
+  const cartContext = useCart();
+  const cartItems = cartContext?.state?.items || [];
+  const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
-  // 5. Auth Protection Logic
-  useEffect(() => {
-    if (isPending || !appIsReady) return;
+  const renderGlobalHeader = () => (
+    <View style={[styles.globalHeader, { paddingTop: insets.top + 8 }, isRTL && { flexDirection: 'row-reverse' }]}>
+      
+      {/* LEFT CLUSTER */}
+      <View style={[styles.brandCluster, isRTL && { flexDirection: 'row-reverse' }]}>
+        <Image 
+          source={require('@/assets/images/app-icon.jpeg')}
+          style={styles.headerLogoImage}
+          resizeMode="contain"
+        />
+        <Text style={styles.brandTitleText}>Brand Gallery</Text>
+      </View>
 
-    const inAuthGroup = segments[0] === '(auth)' || segments[0] === 'otp-login' || segments[0] === 'sign-in' || segments[0] === 'sign-up';
+      {/* RIGHT CLUSTER */}
+      <View style={[styles.actionCluster, isRTL && { flexDirection: 'row-reverse' }]}>
+        <TouchableOpacity style={styles.headerIconButton} onPress={() => router.push('/profile')}>
+          <Ionicons name="person-outline" size={22} color="#000" />
+        </TouchableOpacity>
 
-    if (!session && !inAuthGroup) {
-      router.replace('/sign-in');
-    } else if (session && inAuthGroup) {
-      router.replace('./(tabs)/index');
-    }
-  }, [session, segments, isPending, appIsReady]);
+        <TouchableOpacity style={styles.headerIconButton} onPress={() => router.push('/cart')}>
+          <Ionicons name="bag-outline" size={22} color="#000" />
+          {cartCount > 0 && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{cartCount}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
 
-  // 6. Important: While loading, return NULL so the Splash Screen 
-  // (which is native) stays on top of the screen.
-  if (!appIsReady) {
-    return null;
-  }
+  const tabBarStyleWithInsets = useMemo(() => {
+    const baseHeight = 64; 
+    const bottomPadding = insets.bottom > 0 ? insets.bottom : 12;
+    return {
+      ...styles.tabBar,
+      height: baseHeight + bottomPadding,
+      paddingBottom: bottomPadding,
+    };
+  }, [insets.bottom]);
 
+  return (
+    <Tabs
+      screenOptions={{
+        header: () => renderGlobalHeader(),
+        tabBarHideOnKeyboard: true,
+        tabBarStyle: tabBarStyleWithInsets,
+        tabBarActiveTintColor: '#000',
+        tabBarInactiveTintColor: '#AAA',
+        tabBarLabelStyle: styles.tabLabel,
+        tabBarItemStyle: styles.tabItem, 
+      }}
+    >
+      <Tabs.Screen
+        name="index"
+        options={{
+          tabBarLabel: t('home')?.toUpperCase() || 'HOME',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'home-sharp' : 'home-outline'} size={21} color={color} />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="categories"
+        options={{
+          tabBarLabel: t('categories')?.toUpperCase() || 'CATEGORY',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'grid-sharp' : 'grid-outline'} size={21} color={color} />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="orders"
+        options={{
+          tabBarLabel: t('orders')?.toUpperCase() || 'ORDERS',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'bag-handle-sharp' : 'bag-handle-outline'} size={21} color={color} />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="chat" 
+        options={{
+          tabBarLabel: t('chat')?.toUpperCase() || 'CHAT',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'chatbubble-ellipses-sharp' : 'chatbubble-ellipses-outline'} size={21} color={color} />
+          ),
+        }}
+      />
+
+      {/* HIDDEN ROUTE ENTRIES */}
+      <Tabs.Screen name="profile" options={{ href: null }} />
+      <Tabs.Screen name="products" options={{ href: null }} />
+      <Tabs.Screen name="settings" options={{ href: null }} />
+      <Tabs.Screen name="categories/[id]" options={{ href: null }} />
+      <Tabs.Screen name="orders/[id]" options={{ href: null }} />
+      <Tabs.Screen name="product/[id]" options={{ href: null }} />
+      <Tabs.Screen name="checkout" options={{ href: null }} />
+      <Tabs.Screen name="sign-in" options={{ href: null }} />
+      <Tabs.Screen name="sign-up" options={{ href: null }} />
+      <Tabs.Screen name="otp-login" options={{ href: null }} /> 
+      <Tabs.Screen name="cart" options={{ href: null }} />
+        <Tabs.Screen name="product/[id]/reviews" options={{ href: null }} />
+    </Tabs>
+  );
+}
+
+// 🎯 PART 2: THE ROOT PARENT CONTAINER WRAPPER
+export default function RootLayout() {
   return (
     <LanguageProvider>
       <CartProvider>
-         <Stack
-          screenOptions={{
-            headerShown: false,
-            contentStyle: { backgroundColor: '#fff' },
-            animation: 'fade',
-          }}
-        >
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="checkout" options={{ title: 'CHECKOUT' }} /> 
-          <Stack.Screen name="(auth)/sign-in"  />
-          <Stack.Screen name="(auth)/sign-up"/>
-          <Stack.Screen name="product/[id]" options={{ headerShown: false, presentation: 'card' }} />
-          <Stack.Screen name="cart" options={{ headerShown: true, title: 'MY BAG' }} />
-          <Stack.Screen name="+not-found" options={{ title: 'Oops!' }} />
-        </Stack>
-        <StatusBar style="dark" />
+        <RootLayoutContent />
       </CartProvider>
     </LanguageProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  globalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 20,
+    paddingBottom: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F5F5F5',
+  },
+  brandCluster: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  headerLogoImage: { width: 24, height: 24 },
+  brandTitleText: { fontSize: 14, fontWeight: '900', color: '#000000', letterSpacing: 1.5, textTransform: 'uppercase' },
+  actionCluster: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  headerIconButton: { padding: 4, position: 'relative' },
+
+  tabBar: {
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#F5F5F5',
+    paddingTop: 8,
+    elevation: 20, 
+    shadowColor: '#000000', 
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+  },
+  tabItem: { height: 48, justifyContent: 'center', alignItems: 'center' },
+  tabLabel: { fontSize: 9, fontWeight: '900', marginTop: 2, letterSpacing: 0.6 },
+  badge: { position: 'absolute', top: -2, right: -6, minWidth: 14, height: 14, borderRadius: 7, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: '#FFF' },
+  badgeText: { color: '#fff', fontSize: 7, fontWeight: '900' },
+});

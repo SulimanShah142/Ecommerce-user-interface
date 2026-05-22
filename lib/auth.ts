@@ -21,7 +21,7 @@ export const auth = betterAuth({
     trustedOrigins: [
         "userapp://", 
         "exp://", 
-        "http://192.168.1.4:8787",
+        "http://192.168.1.3:8787",
     ],
     // server/auth.ts
 plugins: [

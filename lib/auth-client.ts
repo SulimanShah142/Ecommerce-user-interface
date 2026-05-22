@@ -3,7 +3,7 @@ import * as SecureStore from "expo-secure-store";
 
 export const authClient = createAuthClient({
     // 1. Point to your active Wrangler / Hono Worker address
-    baseURL: "http://192.168.1.4:8787", 
+    baseURL: "http://192.168.1.3:8787", 
 
     // 2. FIXED: Custom headers must live inside fetchOptions
     fetchOptions: {
@@ -14,21 +14,21 @@ export const authClient = createAuthClient({
 
     // 3. PERSISTENT MEMORY LAYER (KEEPS USER LOGGED IN)
     storage: {
-        async getItem(key) {
+        async getItem(key : any) {
             try {
                 return await SecureStore.getItemAsync(key);
             } catch (e) {
                 return null;
             }
         },
-        async setItem(key, value) {
+        async setItem(key : any, value: any) {
             try {
                 await SecureStore.setItemAsync(key, value);
             } catch (e) {
                 console.error("Storage write failure:", e);
             }
         },
-        async removeItem(key) {
+        async removeItem(key : any) {
             try {
                 await SecureStore.deleteItemAsync(key);
             } catch (e) {

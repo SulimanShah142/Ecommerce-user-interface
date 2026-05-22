@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet, Switch, TouchableOpacity, ScrollView, TextInput, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { authClient } from '../../lib/auth-client';
+import { authClient } from '../lib/auth-client';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 

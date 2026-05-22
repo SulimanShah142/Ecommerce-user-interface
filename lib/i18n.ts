@@ -39,20 +39,27 @@ const TRANSLATIONS: Record<Locale, Record<string, string>> = {
     shippingAddress: 'Shipping Address',
     appLanguage: 'App Language',
     editProfile: 'Edit Profile',
-    verifiedAccount: 'Verified Account',
-    emailLockedHelper: 'Primary email cannot be changed.',
+    password: 'Password',
 
-    // Checkout Screen Specifications
-    checkout: 'Checkout',
-    liveGps: 'Live GPS',
-    gpsDenied: 'Permission Denied',
-    gpsRequired: 'GPS access is required for delivery.',
-    gpsError: 'Could not get your location.',
-    requiredFields: 'Required',
-    fillAllDetails: 'Please fill all details.',
-    orderPlacedSuccess: 'Order placed! 🛍️',
-    serverConnectionFailed: 'Server connection failed.',
-    placeOrder: 'Place Order',
+    // Authentication Screens
+    createAccount: 'CREATE AN ACCOUNT',
+    signUpSubtitle: 'Sign up to start shopping your favorite trends.',
+    welcomeBack: 'WELCOME BACK',
+    enterNamePlaceholder: 'Enter your name',
+    enterEmailPlaceholder: 'Enter your email',
+    passwordPlaceholder: '••••••••',
+    phonePlaceholder: '+93 7XX XXX XXX',
+    register: 'REGISTER',
+    signIn: 'SIGN IN',
+    alreadyHaveAccount: 'Already have an account? ',
+    newToBrandGallery: 'New to Brand Gallery? ',
+    registerNow: 'REGISTER NOW',
+    forgotPassword: 'Forgot Password?',
+    otpLoginTitle: 'OTP SECURE LOGIN',
+    otpSubtitle: 'Enter your phone number to receive a temporary login code.',
+    getOtpCode: 'GET CODE',
+    enterOtpCode: 'ENTER SECURITY CODE',
+    verifyAndLogin: 'VERIFY & LOGIN',
 
     // Orders & Order Tracking ID Pages
     orderDetails: 'Order Details',
@@ -78,7 +85,7 @@ const TRANSLATIONS: Record<Locale, Record<string, string>> = {
     liveTracking: 'Live Tracking',
     taskCompleted: 'Task Completed',
 
-    // Fleet & Operational Manifest System (Admin/Deliverer Specific)
+    // Fleet & Operational Manifest System
     recipient: 'Recipient',
     customerManifest: 'Customer Manifest',
     resolvingAddress: 'Resolving address...',
@@ -144,20 +151,27 @@ const TRANSLATIONS: Record<Locale, Record<string, string>> = {
     shippingAddress: 'آدرس ارسال',
     appLanguage: 'زبان برنامه',
     editProfile: 'ویرایش پروفایل',
-    verifiedAccount: 'حساب تایید شده',
-    emailLockedHelper: 'ایمیل اصلی حساب قابل تغییر نیست.',
+    password: 'رمز عبور',
 
-    // Checkout Screen Specifications
-    checkout: 'بررسی نهایی',
-    liveGps: 'جی پی اس زنده',
-    gpsDenied: 'دسترسی رد شد',
-    gpsRequired: 'دسترسی به جی پی اس برای تحویل بار الزامی است.',
-    gpsError: 'موقعیت مکانی شما یافت نشد.',
-    requiredFields: 'ضروری',
-    fillAllDetails: 'لطفاً تمام جزییات را پر کنید.',
-    orderPlacedSuccess: 'سفارش شما ثبت شد! 🛍️',
-    serverConnectionFailed: 'ارتباط با سرور برقرار نشد.',
-    placeOrder: 'ثبت سفارش',
+    // Authentication Screens
+    createAccount: 'ایجاد حساب کاربری',
+    signUpSubtitle: 'برای شروع خرید لباس‌های مورد علاقه خود ثبت نام کنید.',
+    welcomeBack: 'خوش آمدید',
+    enterNamePlaceholder: 'نام خود را وارد کنید',
+    enterEmailPlaceholder: 'ایمیل خود را وارد کنید',
+    passwordPlaceholder: '••••••••',
+    phonePlaceholder: '۰۷X XXX XXXX',
+    register: 'ثبت نام',
+    signIn: 'ورود به حساب',
+    alreadyHaveAccount: 'قبلاً حساب کاربری ساخته‌اید؟ ',
+    newToBrandGallery: 'تازه وارد هستید؟ ',
+    registerNow: 'اکنون ثبت نام کنید',
+    forgotPassword: 'رمز عبور را فراموش کرده‌اید؟',
+    otpLoginTitle: 'ورود امن با رمز یکبار مصرف',
+    otpSubtitle: 'شماره تلفن خود را وارد کنید تا کد ورود موقت برای شما ارسال شود.',
+    getOtpCode: 'دریافت کد',
+    enterOtpCode: 'کد امنیتی را وارد کنید',
+    verifyAndLogin: 'تایید و ورود',
 
     // Orders & Order Tracking ID Pages
     orderDetails: 'جزییات سفارش',
@@ -183,7 +197,7 @@ const TRANSLATIONS: Record<Locale, Record<string, string>> = {
     liveTracking: 'ردیابی زنده',
     taskCompleted: 'وظیفه انجام شد',
 
-    // Fleet & Operational Manifest System (Admin/Deliverer Specific)
+    // Fleet & Operational Manifest System
     recipient: 'گیرنده',
     customerManifest: 'منیفست مشتری',
     resolvingAddress: 'در حال پیدا کردن آدرس...',
@@ -249,20 +263,27 @@ const TRANSLATIONS: Record<Locale, Record<string, string>> = {
     shippingAddress: 'د لیږد پته',
     appLanguage: 'د اپلیکیشن ژبه',
     editProfile: 'پروفایل سمول',
-    verifiedAccount: 'تایید شوی حساب',
-    emailLockedHelper: 'اصلی بریښنالیک نشي بدلیدلی.',
+    password: 'تېرنوی / پټ نوم',
 
-    // Checkout Screen Specifications
-    checkout: 'وروستی چک آوټ',
-    liveGps: 'ژوندی جي پي ایس',
-    gpsDenied: 'لاسرسی رد شو',
-    gpsRequired: 'د بار رسولو لپاره جی پی اس ته لاسرسی اړین دی.',
-    gpsError: 'ستاسو موقعیت ونه موندل شو.',
-    requiredFields: 'لازمي',
-    fillAllDetails: 'مهرباني وکړئ ټول توضیحات ډک کړئ.',
-    orderPlacedSuccess: 'سفارش مو ثبت شو! 🛍️',
-    serverConnectionFailed: 'له سرور سره اړیکه ټینګه نشوه.',
-    placeOrder: 'سفارش ثبت کړئ',
+    // Authentication Screens
+    createAccount: 'حساب جوړ کړئ',
+    signUpSubtitle: 'خپل د خوښې کالیو پیرلو لپاره همدا اوس راجستر شئ.',
+    welcomeBack: 'ښه راغلاست',
+    enterNamePlaceholder: 'خپل نوم ولیکئ',
+    enterEmailPlaceholder: 'خپل بریښنالیک ولیکئ',
+    passwordPlaceholder: '••••••••',
+    phonePlaceholder: '۰۷X XXX XXXX',
+    register: 'راجستر کول',
+    signIn: 'ننوتل',
+    alreadyHaveAccount: 'مخکې له مخکې حساب لرئ؟ ',
+    newToBrandGallery: 'په سېسټم کې نوي یاست؟ ',
+    registerNow: 'همدا اوس حساب جوړ کړئ',
+    forgotPassword: 'پټ نوم هیر شوی دی؟',
+    otpLoginTitle: 'یو ځل کوډ له لارې خوندي ننوتل',
+    otpSubtitle: 'خپل د تلیفون شمیره ولیکئ ترڅو تاسو ته یو ځل کاریدونکی کوډ واستول شي.',
+    getOtpCode: 'کوډ ترلاسه کړئ',
+    enterOtpCode: 'امنیتي کوډ ولیکئ',
+    verifyAndLogin: 'تایید او ننوتل',
 
     // Orders & Order Tracking ID Pages
     orderDetails: 'د سفارش جزییات',
@@ -288,7 +309,7 @@ const TRANSLATIONS: Record<Locale, Record<string, string>> = {
     liveTracking: 'ژوندی تعقیب',
     taskCompleted: 'دنده ترسره شوه',
 
-    // Fleet & Operational Manifest System (Admin/Deliverer Specific)
+    // Fleet & Operational Manifest System
     recipient: 'ترلاسه کوونکی',
     customerManifest: 'د پیریدونکي منیفست',
     resolvingAddress: 'د پته د موندلو په حال کې...',
@@ -321,7 +342,7 @@ const TRANSLATIONS: Record<Locale, Record<string, string>> = {
     chatSupport: 'چټ ملاتړ',
     emptyCart: 'ستاسو ټاکڼی خالي دی',
     productAdded: 'معلومات په بریالیتوب سره نوي شول.'
-  },
+  } // Fixed syntax closure: changed '}}' to '}'
 };
 
 // 🎯 CRASH PROTECTION: Automatically cleans up and reads out missing keys safely
@@ -334,7 +355,6 @@ export function translate(locale: Locale, key: string) {
     return TRANSLATIONS.en[key];
   }
 
-  // Convert customCamelCase strings to tidy spacing dynamically so the UI stays beautiful
   const cleanFallback = key
     .replace(/([A-Z])/g, ' $1')
     .replace(/^./, (str) => str.toUpperCase());

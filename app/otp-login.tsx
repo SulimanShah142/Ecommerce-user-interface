@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { View, TextInput, TouchableOpacity, Text, Alert, StyleSheet, ActivityIndicator } from 'react-native';
-import { authClient } from '../../lib/auth-client';
+import { authClient } from '../lib/auth-client';
 import { useRouter } from 'expo-router';
 import { OneSignal } from 'react-native-onesignal';
+import { useLanguage } from '@/Contexts/LanguageContext';
 
 export default function OTPLogin() {
   const router = useRouter();
@@ -10,7 +11,7 @@ export default function OTPLogin() {
   const [code, setCode] = useState('');
   const [isStepTwo, setIsStepTwo] = useState(false);
   const [loading, setLoading] = useState(false);
-
+  const { t, isRTL } = useLanguage();
   // Step 1: Request the OTP
  // Step 1: Send the OTP
 // Inside handleSendOTP
@@ -63,8 +64,8 @@ const handleVerifyOTP = async () => {
       
       // Small delay to let the Auth Guard in _layout.tsx catch up
       setTimeout(() => {
-        router.replace('./index');
-      }, 100);
+        router.replace('/');
+      }, 300);
     }
   } catch (e) {
     Alert.alert("Error", "Could not verify session.");
@@ -76,59 +77,74 @@ const handleVerifyOTP = async () => {
 
 return (
   <View style={styles.container}>
-    {/* BRANDING */}
-    <View style={styles.header}>
-      <Text style={styles.brandTitle}>SHEIN</Text>
-      <Text style={styles.welcomeText}>SECURE LOGIN</Text>
-      <Text style={styles.subText}>
+    {/* 1. BRANDING HEADER */}
+    <View style={[styles.header, isRTL && { alignItems: 'flex-end' }]}>
+      <Text style={styles.brandTitle}>Brand Gallery</Text>
+      <Text style={styles.welcomeText}>{t('otpLoginTitle')}</Text>
+      <Text style={[styles.subText, isRTL && { textAlign: 'right' }]}>
         {!isStepTwo 
-          ? "Enter your phone number to receive a verification code." 
-          : `We've sent a 6-digit code to ${phone}`}
+          ? t('otpSubtitle')
+          : isRTL 
+            ? `کد ۶ رقمی به شماره ${phone} ارسال گردید.` // Safe clean inline localization wrapper
+            : `We've sent a 6-digit code to ${phone}`
+        }
       </Text>
     </View>
 
+    {/* 2. DYNAMIC FLOW STEPS */}
     {!isStepTwo ? (
       <View style={styles.form}>
         <View style={styles.inputWrapper}>
-          <Text style={styles.label}>PHONE NUMBER</Text>
+          <Text style={[styles.label, isRTL && { textAlign: 'right' }]}>{t('phoneNumber')}</Text>
           <TextInput 
-            placeholder="+93 7XX XXX XXX" 
+            placeholder={t('phonePlaceholder')} 
             placeholderTextColor="#BBB"
             value={phone} 
             onChangeText={setphone} 
-            style={styles.input}
+            style={[styles.input, isRTL && { textAlign: 'right' }]}
             keyboardType="phone-pad"
           />
         </View>
         <TouchableOpacity style={styles.primaryBtn} onPress={handleSendOTP} disabled={loading}>
-          {loading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.primaryBtnText}>SEND CODE</Text>}
+          {loading ? (
+            <ActivityIndicator color="#FFF" />
+          ) : (
+            <Text style={styles.primaryBtnText}>{t('getOtpCode')}</Text>
+          )}
         </TouchableOpacity>
       </View>
     ) : (
       <View style={styles.form}>
         <View style={styles.inputWrapper}>
-          <Text style={styles.label}>VERIFICATION CODE</Text>
+          <Text style={[styles.label, isRTL && { textAlign: 'right' }]}>{t('enterOtpCode')}</Text>
           <TextInput 
             placeholder="000000" 
-            placeholderTextColor="#EEE"
+            placeholderTextColor="#BBB"
             value={code} 
             onChangeText={setCode} 
             keyboardType="number-pad" 
             maxLength={6}
-            style={[styles.input, styles.codeInput]}
+            style={[styles.input, styles.codeInput, isRTL && { textAlign: 'center', letterSpacing: 6 }]}
           />
         </View>
         <TouchableOpacity style={styles.primaryBtn} onPress={handleVerifyOTP} disabled={loading}>
-          {loading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.primaryBtnText}>VERIFY & SIGN IN</Text>}
+          {loading ? (
+            <ActivityIndicator color="#FFF" />
+          ) : (
+            <Text style={styles.primaryBtnText}>{t('verifyAndLogin')}</Text>
+          )}
         </TouchableOpacity>
         
         <TouchableOpacity onPress={() => setIsStepTwo(false)} style={styles.backLink}>
-          <Text style={styles.backLinkText}>EDIT PHONE NUMBER</Text>
+          <Text style={styles.backLinkText}>
+            {isRTL ? "تغییر شماره تلفن" : "EDIT PHONE NUMBER"}
+          </Text>
         </TouchableOpacity>
       </View>
     )}
   </View>
 );
+
 }
 const styles = StyleSheet.create({
   container: { 

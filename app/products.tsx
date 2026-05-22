@@ -1,18 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useReducer , } from 'react';
 import { View, Text, FlatList, StyleSheet, TouchableOpacity, Alert, RefreshControl, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useCart } from '../../Contexts/CartContext';
-import CachedImage from '../../components/CachedImage';
-import { initOfflineDb, loadProductsLocal, syncRemoteCatalog, isOnline, execSql } from '../../lib/offline';
-import { useLanguage } from '../../Contexts/LanguageContext';
+import { useCart } from '@/Contexts/CartContext';
+import CachedImage from '@/components/CachedImage';
+import { initOfflineDb, loadProductsLocal, syncRemoteCatalog, isOnline, execSql } from '@/lib/offline';
+import { useLanguage } from '@/Contexts/LanguageContext';
 import { authClient } from '@/lib/auth-client';
 
 const API_URL = "http://192.168.1.3:8787";
 
 export default function ProductsPage() {
   const router = useRouter();
-  const { dispatch } = useCart();
   const { t, isRTL } = useLanguage();
   const { data: session } = authClient.useSession();
   
@@ -31,12 +30,13 @@ export default function ProductsPage() {
       await loadProducts(true); 
       setLoading(false);
 
-      if (await isOnline()) {
+      const online = await isOnline().catch(() => false);
+      if (online) {
         await syncRemoteCatalog();
         await loadProducts(false);
       }
     } catch (e) {
-      console.error("Setup failed:", e);
+      console.error("❌ Setup failed:", e);
       setLoading(false);
     }
   };
@@ -54,37 +54,46 @@ export default function ProductsPage() {
         setSettings(settingsResult[0]); 
       }
 
-      if (!isInitial && await isOnline()) {
+      const online = await isOnline().catch(() => false);
+      if (!isInitial && online) {
         const sRes = await fetch(`${API_URL}/api/admin/settings`);
-        const freshSettings = await sRes.json();
-        setSettings(freshSettings);
+        if (sRes.ok) {
+          const freshSettings = await sRes.json();
+          setSettings(freshSettings);
+        }
       }
     } catch (err) {
       console.error('Failed to load products/settings', err);
     }
   };
 
-  // MISSING FUNCTION: Fixed and added back
+  // 🎯 RE-ENGINEERED UNIFIED DISP PRICE CALCULATOR
   const getDisplayPrice = (usdPrice: string) => {
-    if (!settings) return "...";
-    const rate = parseFloat(settings.usdToAfnRate || '65');
-    const profit = parseFloat(settings.profitPercentage || '20');
-    let baseAfn = parseFloat(usdPrice || '0') * rate;
-    let finalPrice = baseAfn * (1 + profit / 100);
+    // 🎯 FIX A: Aligned default fallback constants ('68' and '20') to guarantee calculation uniformity on boot
+    const rate = parseFloat(settings?.usdToAfnRate || '68');
+    const profit = parseFloat(settings?.profitPercentage || '20');
+    
+    const baseAfn = parseFloat(usdPrice || '0') * rate;
+    
+    // 🎯 FIX B: Swapped out legacy multi-fraction multiplication logic with the standardized addition layout formula
+    let finalPrice = baseAfn + (baseAfn * (profit / 100));
 
-    // New User Discount Check
-    if (settings.newUserDiscountActive && session?.user?.createdAt) {
+    // Dynamic New User Promotional Eligibility Check Cues
+    if (settings?.newUserDiscountActive && session?.user?.createdAt) {
       const signupDate = new Date(session.user.createdAt).getTime();
       const hoursSinceSignup = (new Date().getTime() - signupDate) / (1000 * 60 * 60);
+      
       if (hoursSinceSignup <= (parseInt(settings.discountDurationHours) || 24)) {
+        const discountVal = parseFloat(settings.newUserDiscountValue || '0');
         if (settings.newUserDiscountType === 'percentage') {
-          finalPrice *= (1 - parseFloat(settings.newUserDiscountValue) / 100);
+          finalPrice *= (1 - discountVal / 100);
         } else {
-          finalPrice -= parseFloat(settings.newUserDiscountValue);
+          finalPrice -= discountVal;
         }
       }
     }
-    return Math.round(finalPrice).toLocaleString();
+    
+    return Math.round(Math.max(0, finalPrice)).toLocaleString();
   };
 
   const onRefresh = async () => {
