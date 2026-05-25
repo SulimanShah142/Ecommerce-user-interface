@@ -154,7 +154,7 @@ export default function CategoriesPage() {
     </TouchableOpacity>
   );
 
-  
+
 
   if (loading) return <View style={styles.center}><ActivityIndicator size="large" color="#000" /></View>;
 

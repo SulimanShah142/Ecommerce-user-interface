@@ -1,5 +1,6 @@
+import { Ionicons } from '@expo/vector-icons';
 import React, { useMemo, useRef, useEffect, useState } from 'react';
-import { View, StyleSheet, ActivityIndicator, Platform } from 'react-native';
+import { View, StyleSheet, ActivityIndicator, Platform, TouchableOpacity } from 'react-native';
 import { WebView } from 'react-native-webview';
 
 type UnifiedMapProps = {
@@ -21,7 +22,7 @@ export default function UnifiedMap({
 }: UnifiedMapProps) {
   const webViewRef = useRef<WebView>(null);
   const [loading, setLoading] = useState(true);
-
+const [isFullscreen, setisFullscreen] = useState(false)
   // 1. EXTRACT EXPLICIT COORDINATES WITH STABLE DEFAULT FALLBACKS
   const whLat = warehouseCoords[0];
   const whLng = warehouseCoords[1];
@@ -56,6 +57,7 @@ export default function UnifiedMap({
   };
 
   // 3. ENCLOSED LEAFLET STRUCTURAL HTML GENERATION ENGINE
+  // 3. ENCLOSED LEAFLET STRUCTURAL HTML GENERATION ENGINE
   const mapHtml = useMemo(() => {
     return `
       <!DOCTYPE html>
@@ -65,7 +67,7 @@ export default function UnifiedMap({
         <meta name="viewport" content="width=device-width, initial-scale=0.8, maximum-scale=1.0, user-scalable=no" />
         
         <!-- Fully qualified, explicit CDN paths for Leaflet -->
-       <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
               integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
               crossorigin=""/>
         <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
@@ -73,7 +75,14 @@ export default function UnifiedMap({
                 crossorigin=""></script>
         
         <style>
-          body { margin: 0; padding: 0; }
+           html, body {
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            overflow: hidden !important;
+            background-color: #FAFAFA;
+          }
           #map { height: 100vh; width: 100vw; background: #e0e0e0; }
           .icon-label { font-size: 24px; text-align: center; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.3)); }
         </style>
@@ -177,7 +186,6 @@ export default function UnifiedMap({
                     [rawWhLat, rawWhLng],
                     [rawDestLat, rawDestLng]
                   ]);
-                  // 🎯 FIXED: Restored layout bounding padding coordinates cleanly
                   map.fitBounds(bounds, { padding: [40, 40] });
                 }
               })
@@ -192,17 +200,73 @@ export default function UnifiedMap({
   }, [role, whLat, whLng, destLat, destLng, drvLat, drvLng, hasDriver, hasWarehouse, hasDest, centerLat, centerLng]);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, isFullscreen && styles.fullscreenContainer]}>
+      
+      {/* NATIVE INTERFACE WEB VIEW BROWSING BRIDGE */}
       <WebView
         ref={webViewRef}
         originWhitelist={['*']}
         source={{ html: mapHtml }}
         onLoadEnd={() => setLoading(false)}
-        onMessage={handleMessage} 
+        onMessage={handleMessage}
         javaScriptEnabled={true}
         domStorageEnabled={true}
         style={styles.map}
       />
+
+      {/* FLOATING MAP CONTROLS */}
+      {!loading && (
+        <View style={styles.floatingControlsGroup}>
+
+          {/* ZOOM IN */}
+          <TouchableOpacity
+            style={styles.controlPillBtn}
+            activeOpacity={0.7}
+            onPress={() =>
+              webViewRef.current?.injectJavaScript(`
+                map.zoomIn();
+                true;
+              `)
+            }
+          >
+            <Ionicons name="add-sharp" size={20} color="#000000" />
+          </TouchableOpacity>
+
+          <View style={styles.pillHairlineDivider} />
+
+          {/* ZOOM OUT */}
+          <TouchableOpacity
+            style={styles.controlPillBtn}
+            activeOpacity={0.7}
+            onPress={() =>
+              webViewRef.current?.injectJavaScript(`
+                map.zoomOut();
+                true;
+              `)
+            }
+          >
+            <Ionicons name="remove-sharp" size={20} color="#000000" />
+          </TouchableOpacity>
+
+          <View style={styles.pillHairlineDivider} />
+
+          {/* FULLSCREEN TOGGLE */}
+          <TouchableOpacity
+            style={styles.controlPillBtn}
+            activeOpacity={0.7}
+            onPress={() => setIsFullscreen(prev => !prev)}
+          >
+            <Ionicons
+              name={isFullscreen ? "contract-sharp" : "scan-sharp"}
+              size={18}
+              color="#000000"
+            />
+          </TouchableOpacity>
+
+        </View>
+      )}
+
+      {/* LOADER */}
       {loading && (
         <View style={styles.loaderCover}>
           <ActivityIndicator size="small" color="#000000" />
@@ -212,8 +276,62 @@ export default function UnifiedMap({
   );
 }
 
+// 🎯 INDUSTRIAL STUDIO VIEW STYLESHEET WITH FULL PILL DESIGNERS
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#E0E0E0', position: 'relative' },
-  map: { flex: 1 },
-  loaderCover: { ...StyleSheet.absoluteFillObject, backgroundColor: '#F8F9FA', justifyContent: 'center', alignItems: 'center' }
+  container: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    position: 'relative'
+  },
+  fullscreenContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+    zIndex: 9999,
+    elevation: 9999,
+    backgroundColor: '#FFFFFF'
+  },
+  map: {
+    flex: 1,
+    width: '100%',
+    height: '100%'
+  },
+  loaderCover: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 99
+  },
+  floatingControlsGroup: {
+    position: 'absolute',
+    bottom: 24,
+    right: 16,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#EFEFEF',
+    borderRadius: 2,
+    elevation: 4,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    zIndex: 1000
+  },
+  controlPillBtn: {
+    width: 38,
+    height: 38,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF'
+  },
+  pillHairlineDivider: {
+    height: 1,
+    backgroundColor: '#EEEEEE',
+    width: '100%'
+  }
 });

@@ -14,7 +14,8 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/app-icon.jpeg",
-        "backgroundColor": "#FFFFFF"
+        "backgroundColor": "#FFFFFF",
+         "softwareKeyboardLayoutMode": "resize"
       },
       "package": "com.slliman.userapp",
       "googleServicesFile": "./google-services.json",

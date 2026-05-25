@@ -4,7 +4,7 @@ import { Platform } from 'react-native';
 import * as Crypto from 'expo-crypto'; 
 import * as FileSystem from 'expo-file-system/legacy';
 const DATABASE_NAME = 'ecommerce-offline.db';
-const API_URL = "http://192.168.1.3:8787";
+const API_URL = "https://brand-gallery-backend.brand-gallery.workers.dev";
 
 
 

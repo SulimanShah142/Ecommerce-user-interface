@@ -6,9 +6,9 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { authClient } from '@/lib/auth-client';
-import { useLanguage } from '../Contexts/LanguageContext';
+import { useLanguage } from '@/Contexts/LanguageContext';
 
-const API_URL = "http://192.168.1.3:8787";
+const API_URL = "https://brand-gallery-backend.brand-gallery.workers.dev";
 
 export default function ProfileScreen() {
   const router = useRouter();

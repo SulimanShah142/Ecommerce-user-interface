@@ -6,7 +6,7 @@ import UnifiedMap from '@/components/UnifiedMap';
 import { useLanguage } from '@/Contexts/LanguageContext';
 
 const { width } = Dimensions.get('window');
-const API_URL = "http://192.168.1.3:8787";
+const API_URL = "https://brand-gallery-backend.brand-gallery.workers.dev";
 
 export default function UserOrderDetails() {
   const { id } = useLocalSearchParams();

@@ -17,13 +17,12 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useCart } from "@/Contexts/CartContext";
 import { useLanguage } from "@/Contexts/LanguageContext";
-import * as ImagePicker from 'expo-image-picker'; // 🎯 NEEDED FOR GALLERY HARDWARE ENTRY
-import { uploadImage } from '@/lib/uploadthing'; // 🎯 POINTS DIRECTLY TO YOUR REAL UPLOADTHING HELPERS UTILITY FILE
-import * as ImageManipulator from 'expo-image-manipulator'; // 🎯 ENSURE THIS IS IMPORTED
+import * as ImagePicker from "expo-image-picker"; // 🎯 NEEDED FOR GALLERY HARDWARE ENTRY
+import { uploadImage } from "@/lib/uploadthing"; // 🎯 POINTS DIRECTLY TO YOUR REAL UPLOADTHING HELPERS UTILITY FILE
+import * as ImageManipulator from "expo-image-manipulator"; // 🎯 ENSURE THIS IS IMPORTED
 
-
-const API_URL = "http://192.168.1.3:8787";
-  const { width } = Dimensions.get('window');
+const API_URL = "https://brand-gallery-backend.brand-gallery.workers.dev";
+const { width } = Dimensions.get("window");
 export default function UserProductDetails() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
@@ -38,7 +37,6 @@ export default function UserProductDetails() {
   const [reviews, setReviews] = useState<any[]>([]);
   const [similarProducts, setSimilarProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-
   // Interaction States
   const [activeTab, setActiveTab] = useState<"DETAILS" | "REVIEWS">("DETAILS");
   const [selectedSize, setSelectedSize] = useState<string>("M");
@@ -63,11 +61,28 @@ export default function UserProductDetails() {
             fetch(`${API_URL}/api/products/${id}/reviews`),
             fetch(`${API_URL}/api/products?limit=6`),
           ]);
-
+        // Inside your loadProductData() async routine inside the useEffect hook
         const prodData = await prodRes.json();
         const settingsData = await settingsRes.json();
         const reviewsData = await reviewsRes.json();
         const similarData = await similarRes.json();
+
+        setProduct(prodData);
+        setSettings(settingsData);
+        setReviews(Array.isArray(reviewsData) ? reviewsData : []);
+
+        // 🎯 THE CRITICAL CONFIGURATION FIX: Auto-select the first actual color returned from your Neon database!
+        if (prodData?.availableColors && prodData.availableColors.length > 0) {
+          setSelectedColor(prodData.availableColors[0]);
+        } else {
+          setSelectedColor("Standard"); // Reliable backup if the item lacks explicit color properties
+        }
+
+        if (Array.isArray(similarData)) {
+          setSimilarProducts(
+            similarData.filter((p: any) => p.id !== id).slice(0, 4),
+          );
+        }
 
         setProduct(prodData);
         setSettings(settingsData);
@@ -88,7 +103,6 @@ export default function UserProductDetails() {
     loadProductData();
   }, [id]);
 
-  // 2. Computed Converted Afghani Retails Pricing
   const finalDisplayPrice = useMemo(() => {
     if (!product) return 0;
     const rate = parseFloat(settings?.usdToAfnRate || "68");
@@ -99,67 +113,66 @@ export default function UserProductDetails() {
   }, [product, settings]);
 
   // 3. Media Upload & Review Handlers
-  // app/product/[id].tsx -> Core Interaction Logic Block
-const handlePickAndUploadImage = async () => {
-  try {
-    // 1. Request gallery permissions from the hardware device OS
-    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permissionResult.granted) {
-      Alert.alert(t("error") || "Permission Blocked", "Gallery permissions are required to attach review images.");
-      return;
+  const handlePickAndUploadImage = async () => {
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permissionResult.granted) {
+        // 🎯 THE ALERT FIX: Localized Permission Rejections Text Banners
+        Alert.alert(
+          t("permissionBlocked") || "Permission Blocked",
+          t("galleryRequired") || "Gallery access is required.",
+        );
+        return;
+      }
+
+      const pickerResult = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        quality: 0.5,
+      });
+
+      if (pickerResult.canceled || !pickerResult.assets?.[0]) return;
+
+      setUploading(true);
+
+      const optimizedImage = await ImageManipulator.manipulateAsync(
+        pickerResult.assets[0].uri,
+        [{ resize: { width: 600 } }],
+        { compress: 0.3, format: ImageManipulator.SaveFormat.JPEG },
+      );
+
+      const remoteCdnUrl = await uploadImage(optimizedImage.uri);
+
+      if (remoteCdnUrl) {
+        console.log("🚀 Secure CDN Link saved to local cache rows:", remoteCdnUrl);
+
+        setUploadedPhotos((prevArray) => {
+          const updated = [...prevArray, remoteCdnUrl];
+          console.log("📸 Current local file collection stack count:", updated.length);
+          return updated;
+        });
+
+        // 🎯 THE ALERT FIX: Localized Image Attachment Success
+        Alert.alert(
+          t("photoAttached") || "Success", 
+          t("photoAttachedBody") || "Photo attached successfully!"
+        );
+      } else {
+        throw new Error("Empty URL returned from gateway route.");
+      }
+    } catch (e: any) {
+      console.error("❌ Media upload thread broken:", e.message);
+      // 🎯 THE ALERT FIX: Localized Upload Errors
+      Alert.alert(
+        t("uploadStalled") || "Upload Stalled",
+        t("uploadStalledBody") || "Could not complete image stream operations.",
+      );
+    } finally {
+      setUploading(false);
     }
-
-    // 2. Launch native mobile camera roll selection sheet
-    const pickerResult = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      quality: 0.5, // Initial fast compression pass
-    });
-
-    if (pickerResult.canceled || !pickerResult.assets?.[0]) {
-      console.log("📸 Image picker cancelled by customer.");
-      return;
-    }
-
-    const selectedAsset = pickerResult.assets[0];
-    
-    // Trigger progress loading feedback spinners instantly
-    setUploading(true);
-    console.log("🖼️ Raw image locked, starting on-device optimization pass...");
-
-    // 3. 🎯 THE SPEED FIX: Manipulate and shrink the asset uri before uploading!
-    // Scales the image to 600px width and strips quality to a lightweight 30% compressed JPEG binary
-    const optimizedImage = await ImageManipulator.manipulateAsync(
-      selectedAsset.uri,
-      [{ resize: { width: 600 } }], // Keeps aspect ratio intact while down-sizing width boundary
-      { compress: 0.3, format: ImageManipulator.SaveFormat.JPEG } // Sharp web compression ratio
-    );
-
-    console.log("⚡ Optimization complete. Scaled file path:", optimizedImage.uri);
-    console.log("📤 Pushing lightweight compressed image through UploadThing endpoints...");
-
-    // 4. Send the super-lightweight compressed local image URI onto your edge network
-    const remoteCdnUrl = await uploadImage(optimizedImage.uri);
-
-    if (remoteCdnUrl) {
-      console.log("✅ Upload successful. CDN Link secured:", remoteCdnUrl);
-      
-      // Save the direct uploaded image link string token directly inside your view state array rows
-      setUploadedPhotos((prev) => [...prev, remoteCdnUrl]);
-    } else {
-      throw new Error("UploadThing structural routing error");
-    }
-
-  } catch (e: any) {
-    console.error("❌ High-speed review media upload failed:", e.message);
-    Alert.alert(t("error") || "Upload Stalled", "Could not process review image storage across edge node endpoints.");
-  } finally {
-    setUploading(false); // Shut down progress loading spin indicators instantly
-  }
-};
-
+  };
 
   const submitReview = async () => {
-    if (!comment.trim()) return Alert.alert(t("error"), t("fillAllDetails"));
+    if (!comment.trim()) return Alert.alert(t("error") || "Error", t("fillAllDetails") || "Please fill details.");
     try {
       const res = await fetch(`${API_URL}/api/reviews`, {
         method: "POST",
@@ -174,25 +187,39 @@ const handlePickAndUploadImage = async () => {
       });
 
       if (res.ok) {
-        Alert.alert(t("success"), "Review Posted!");
+        // 🎯 THE ALERT FIX: Localized Review Creation Confirmed
+        Alert.alert(
+          t("reviewPosted") || "Success", 
+          t("reviewPostedBody") || "Review Posted!"
+        );
         setComment("");
         setUploadedPhotos([]);
-        const freshReviews = await fetch(
-          `${API_URL}/api/products/${id}/reviews`,
-        ).then((r) => r.json());
+        const freshReviews = await fetch(`${API_URL}/api/products/${id}/reviews`).then((r) => r.json());
         setReviews(freshReviews);
       }
     } catch (e) {
-      Alert.alert(t("error"), "Failed to publish review.");
+      // 🎯 THE ALERT FIX: Localized Review Fallback Failure
+      Alert.alert(
+        t("error") || "Error", 
+        t("reviewFailedBody") || "Failed to publish review."
+      );
     }
   };
 
   const addToCart = () => {
     if (!product) return;
     if (!selectedSize) {
+      // 🎯 THE ALERT FIX: Localized Selection Validation Guard
       return Alert.alert(
-        t("error") || "Error",
-        "Please select a product size before continuing.",
+        t("error") || "Error", 
+        t("sizeRequired") || "Please select a product size before continuing."
+      );
+    }
+    if (!selectedColor) {
+      // 🎯 THE ALERT FIX: Localized Selection Validation Guard
+      return Alert.alert(
+        t("error") || "Error", 
+        t("colorRequired") || "Please select a product color before continuing."
       );
     }
 
@@ -203,9 +230,16 @@ const handlePickAndUploadImage = async () => {
 
     dispatchAddToCart(optimizedProductPayload, 1, selectedSize, selectedColor);
 
+    // 🎯 THE ALERT FIX: Dynamic Macro Text Interpolation for Shopping Bag Feedback
+    const successTemplate = t('addedToBagBody') || "{name} ({size} / {color}) has been added to your shopping bag.";
+    const formattedAlertMessage = successTemplate
+      .replace('{name}', product.name?.toUpperCase() || '')
+      .replace('{size}', selectedSize)
+      .replace('{color}', selectedColor.toUpperCase());
+
     Alert.alert(
-      t("success") || "Added",
-      `${product.name?.toUpperCase()} (${selectedSize}) has been added to your shopping bag.`,
+      t("addedToBag") || "Added to Bag",
+      formattedAlertMessage
     );
   };
 
@@ -241,7 +275,11 @@ const handlePickAndUploadImage = async () => {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={{ flex: 1 }}
       >
-        <ScrollView showsVerticalScrollIndicator={false} style={styles.scroll}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollContentContainer}
+        >
           {/* IMAGE SECTION */}
           <View style={styles.imageFrameWrapper}>
             <Image
@@ -304,109 +342,102 @@ const handlePickAndUploadImage = async () => {
             <View style={styles.dividerHairline} />
 
             {/* SIZE */}
-            <View
-              style={[
-                styles.sizeMatrixHeader,
-                isRTL && { flexDirection: "row-reverse" },
-              ]}
-            >
+            {/* 🎯 SIZE SELECTOR LAYOUT HEADERS */}
+            <View style={[styles.sizeMatrixHeader, isRTL && { flexDirection: "row-reverse" }]}>
               <Text style={styles.sizeSectionTitle}>
-                {/* 🎯 THE FIX: Changed 'language === "English"' to 'locale === "en"' */}
-                {locale === "en" ? "SELECT SIZE" : "اندازه را انتخاب کنید"}
+                {(t('selectSize') || 'SELECT SIZE').toUpperCase()}
               </Text>
-
-              <Text style={styles.sizeGuideLabelText}>SIZE GUIDE</Text>
+              <Text style={styles.sizeGuideLabelText}>
+                {(t('sizeGuide') || 'SIZE GUIDE').toUpperCase()}
+              </Text>
             </View>
 
-            <View
-              style={[
-                styles.sizeGridWrapper,
-                isRTL && { flexDirection: "row-reverse" },
-              ]}
-            >
+            <View style={[styles.sizeGridWrapper, isRTL && { flexDirection: "row-reverse" }]}>
               {["S", "M", "L", "XL"].map((size) => (
                 <TouchableOpacity
                   key={`size-${size}`}
-                  style={[
-                    styles.sizeItemBox,
-                    selectedSize === size && styles.sizeItemBoxActive,
-                  ]}
+                  style={[styles.sizeItemBox, selectedSize === size && styles.sizeItemBoxActive]}
                   onPress={() => setSelectedSize(size)}
                 >
-                  <Text
-                    style={[
-                      styles.sizeText,
-                      selectedSize === size && styles.sizeTextActive,
-                    ]}
-                  >
+                  <Text style={[styles.sizeText, selectedSize === size && styles.sizeTextActive]}>
                     {size}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
 
-            {/* TABS */}
-            <View
-              style={[
-                styles.segmentTabBar,
-                isRTL && { flexDirection: "row-reverse" },
-              ]}
-            >
+            {/* 🎯 COLOR SELECTOR LAYOUT HEADERS */}
+            <View style={[styles.sizeMatrixHeader, { marginTop: 15 }, isRTL && { flexDirection: 'row-reverse' }]}>
+              <Text style={styles.sizeSectionTitle}>
+                {(t('selectColor') || 'SELECT COLOR').toUpperCase()}
+              </Text>
+            </View>
+
+            <View style={[styles.sizeGridWrapper, { flexWrap: 'wrap' }, isRTL && { flexDirection: 'row-reverse' }]}>
+              {product?.availableColors && product.availableColors.length > 0 ? (
+                product.availableColors.flatMap((item: string) => 
+                  typeof item === 'string' ? item.split(',') : [item]
+                ).map((rawColor: string) => {
+                  const color = rawColor.trim();
+                  if (!color) return null;
+                  
+                  return (
+                    <TouchableOpacity 
+                      key={`color-pill-separated-${color}`} 
+                      style={[
+                        styles.sizeItemBox, 
+                        { flex: 0, minWidth: 64, paddingHorizontal: 16 }, 
+                        selectedColor === color && styles.sizeItemBoxActive
+                      ]}
+                      onPress={() => setSelectedColor(color)}
+                    >
+                      <Text style={[styles.sizeText, selectedColor === color && styles.sizeTextActive]}>
+                        {color.toUpperCase()}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })
+              ) : (
+                <View style={[styles.sizeItemBox, styles.sizeItemBoxActive, { flex: 0, paddingHorizontal: 20 }]}>
+                  <Text style={styles.sizeTextActive}>
+                    {(t('standardColor') || 'STANDARD').toUpperCase()}
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {/* 🎯 TABS SEGMENT STRIP LAYOUT */}
+            <View style={[styles.segmentTabBar, isRTL && { flexDirection: "row-reverse" }]}>
               <TouchableOpacity
-                style={[
-                  styles.segmentTabBtn,
-                  activeTab === "DETAILS" && styles.segmentTabBtnActive,
-                ]}
+                style={[styles.segmentTabBtn, activeTab === "DETAILS" && styles.segmentTabBtnActive]}
                 onPress={() => setActiveTab("DETAILS")}
               >
-                <Text
-                  style={[
-                    styles.segmentTabText,
-                    activeTab === "DETAILS" && styles.segmentTabTextActive,
-                  ]}
-                >
-                  {/* 🎯 THE FIX: Changed 'language === "English"' to 'locale === "en"' */}
-                  {locale === "en" ? "DETAILS" : "جزئیات"}
+                <Text style={[styles.segmentTabText, activeTab === "DETAILS" && styles.segmentTabTextActive]}>
+                  {(t('details') || 'DETAILS').toUpperCase()}
                 </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[
-                  styles.segmentTabBtn,
-                  activeTab === "REVIEWS" && styles.segmentTabBtnActive,
-                ]}
+                style={[styles.segmentTabBtn, activeTab === "REVIEWS" && styles.segmentTabBtnActive]}
                 onPress={() => setActiveTab("REVIEWS")}
               >
-                <Text
-                  style={[
-                    styles.segmentTabText,
-                    activeTab === "REVIEWS" && styles.segmentTabTextActive,
-                  ]}
-                >
-                  REVIEWS ({reviews.length})
+                <Text style={[styles.segmentTabText, activeTab === "REVIEWS" && styles.segmentTabTextActive]}>
+                  {(t('reviewsTab') || 'REVIEWS').toUpperCase()} ({reviews.length})
                 </Text>
               </TouchableOpacity>
             </View>
 
-            {/* TAB CONTENT */}
+            {/* 🎯 TAB WINDOW BODY SECTIONS CONTAINER */}
             <View style={styles.tabContentViewWrapper}>
               {activeTab === "DETAILS" ? (
-                <Text
-                  style={[
-                    styles.bodyDescriptionText,
-                    isRTL && { textAlign: "right" },
-                  ]}
-                >
-                  {product.description ||
-                    t("noDescription") ||
-                    "No description provided."}
+                <Text style={[styles.bodyDescriptionText, isRTL && { textAlign: "right" }]}>
+                  {product.description || t("noDescription") || "No description provided."}
                 </Text>
               ) : (
                 <View>
-                  {/* REVIEW FORM */}
                   <View style={styles.reviewFormCard}>
                     <Text style={styles.formSectionTitle}>
-                      SHARE YOUR EXPERIENCE
+                      {(t('shareYourExperience') || 'SHARE YOUR EXPERIENCE').toUpperCase()}
                     </Text>
 
                     <View style={styles.starsFormRow}>
@@ -414,29 +445,15 @@ const handlePickAndUploadImage = async () => {
                     </View>
 
                     <TextInput
-                      placeholder={
-                        t("typeMessage") ||
-                        "Write your opinion about size, fit, or material..."
-                      }
+                      placeholder={t("writeOpinionPlaceholder") || "Write your opinion about size, fit, or material..."}
                       placeholderTextColor="#999"
-                      style={[
-                        styles.commentInputField,
-                        isRTL && { textAlign: "right" },
-                      ]}
+                      style={[styles.commentInputField, isRTL && { textAlign: "right" }]}
                       value={comment}
                       onChangeText={setComment}
                       multiline
                     />
 
-                    {/* UPLOAD */}
-                    <View
-                      style={[
-                        styles.photoUploadStrip,
-                        isRTL && {
-                          flexDirection: "row-reverse",
-                        },
-                      ]}
-                    >
+                    <View style={[styles.photoUploadStrip, isRTL && { flexDirection: "row-reverse" }]}>
                       <TouchableOpacity
                         style={styles.uploadBoxBtn}
                         onPress={handlePickAndUploadImage}
@@ -446,12 +463,10 @@ const handlePickAndUploadImage = async () => {
                           <ActivityIndicator size="small" color="#000" />
                         ) : (
                           <>
-                            <Ionicons
-                              name="camera-outline"
-                              size={18}
-                              color="#000"
-                            />
-                            <Text style={styles.uploadBoxText}>ADD PHOTOS</Text>
+                            <Ionicons name="camera-outline" size={18} color="#000" />
+                            <Text style={styles.uploadBoxText}>
+                              {(t('addPhotos') || 'ADD PHOTOS').toUpperCase()}
+                            </Text>
                           </>
                         )}
                       </TouchableOpacity>
@@ -461,46 +476,39 @@ const handlePickAndUploadImage = async () => {
                         showsHorizontalScrollIndicator={false}
                         contentContainerStyle={{ gap: 8 }}
                       >
-                        {uploadedPhotos.map((url, i) => (
-                          <Image
-                            key={`upload-thumb-${i}`}
-                            source={{ uri: url }}
-                            style={styles.uploadedPreviewThumb}
-                          />
-                        ))}
+                        {Array.isArray(uploadedPhotos) &&
+                          uploadedPhotos.map((url, i) => (
+                            <Image
+                              key={`upload-thumb-row-${i}`}
+                              source={{ uri: url.toString() }}
+                              style={styles.uploadedPreviewThumb}
+                            />
+                          ))}
                       </ScrollView>
+
                     </View>
 
-                    <TouchableOpacity
+                                        <TouchableOpacity
                       style={styles.submitButtonBlock}
                       onPress={submitReview}
                     >
                       <Text style={styles.submitButtonText}>
-                        POST CLIENT REVIEW
+                        {(t('postClientReview') || 'POST CLIENT REVIEW').toUpperCase()}
                       </Text>
                     </TouchableOpacity>
                   </View>
 
-                  {/* REVIEWS */}
-                  {reviews.length > 0 ? (
+                  {/* ACTIVE FEEDBACK PREVIEWS */}
+                  {reviews.length > 0 && (
                     <View style={styles.previewReviewsSection}>
-                      <View
-                        style={[
-                          styles.previewHeaderRow,
-                          isRTL && {
-                            flexDirection: "row-reverse",
-                          },
-                        ]}
-                      >
+                      <View style={[styles.previewHeaderRow, isRTL && { flexDirection: "row-reverse" }]}>
                         <Text style={styles.previewTitle}>
-                          REVIEWS PREVIEW ({reviews.length})
+                          {(t('reviewsPreview') || 'REVIEWS PREVIEW').toUpperCase()} ({reviews.length})
                         </Text>
 
-                        <TouchableOpacity
-                          onPress={() => router.push(`/product/${id}/reviews`)}
-                        >
+                        <TouchableOpacity onPress={() => router.push(`product/${id}/reviews`)}>
                           <Text style={styles.viewAllTriggerLinkText}>
-                            VIEW ALL REVIEWS →
+                            {t('viewAllReviews') || 'VIEW ALL REVIEWS →'}
                           </Text>
                         </TouchableOpacity>
                       </View>
@@ -508,42 +516,16 @@ const handlePickAndUploadImage = async () => {
                       <ScrollView
                         horizontal
                         showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={[
-                          isRTL && {
-                            flexDirection: "row-reverse",
-                          },
-                        ]}
                         style={styles.horizontalReviewsScrollWrapper}
                       >
                         {reviews.slice(0, 4).map((item: any, idx: number) => {
-                          let reviewImages: string[] = [];
-
-                          try {
-                            reviewImages = Array.isArray(item.images)
-                              ? item.images
-                              : JSON.parse(item.images || "[]");
-                          } catch {
-                            reviewImages = [];
-                          }
+                          const reviewImages = item.images ? JSON.parse(item.images) : [];
 
                           return (
-                            <View
-                              key={`review-node-${idx}`}
-                              style={styles.horizontalReviewTile}
-                            >
-                              <View
-                                style={[
-                                  styles.tileHeaderRow,
-                                  isRTL && {
-                                    flexDirection: "row-reverse",
-                                  },
-                                ]}
-                              >
-                                <Text
-                                  style={styles.buyerNameText}
-                                  numberOfLines={1}
-                                >
-                                  {item.userName || "Verified Buyer"}
+                            <View key={`review-node-${idx}`} style={styles.horizontalReviewTile}>
+                              <View style={[styles.tileHeaderRow, isRTL && { flexDirection: "row-reverse" }]}>
+                                <Text style={styles.buyerNameText} numberOfLines={1}>
+                                  {item.userName || t('buyerVerified') || "Verified Buyer"}
                                 </Text>
 
                                 <View style={styles.starsRowWrap}>
@@ -551,140 +533,84 @@ const handlePickAndUploadImage = async () => {
                                 </View>
                               </View>
 
-                              <Text
-                                style={[
-                                  styles.buyerCommentParagraph,
-                                  isRTL && {
-                                    textAlign: "right",
-                                  },
-                                ]}
-                                numberOfLines={3}
-                              >
+                              <Text style={[styles.buyerCommentParagraph, isRTL && { textAlign: "right" }]} numberOfLines={3}>
                                 {item.comment}
                               </Text>
 
                               {reviewImages.length > 0 && (
-                                <View
-                                  style={[
-                                    styles.attachedImagesRow,
-                                    isRTL && {
-                                      flexDirection: "row-reverse",
-                                    },
-                                  ]}
-                                >
-                                  {reviewImages
-                                    .slice(0, 2)
-                                    .map((imgUrl: string, imgIdx: number) => (
-                                      <Image
-                                        key={`preview-img-${imgIdx}`}
-                                        source={{
-                                          uri: imgUrl,
-                                        }}
-                                        style={styles.attachedReviewThumb}
-                                      />
-                                    ))}
+                                <View style={[styles.attachedImagesRow, isRTL && { flexDirection: "row-reverse" }]}>
+                                  {reviewImages.slice(0, 2).map((imgUrl: string, imgIdx: number) => (
+                                    <Image
+                                      key={`preview-img-${imgIdx}`}
+                                      source={{ uri: imgUrl }}
+                                      style={styles.attachedReviewThumb}
+                                    />
+                                  ))}
                                 </View>
                               )}
 
-                              <Text
-                                style={[
-                                  styles.tileFooterDate,
-                                  isRTL && {
-                                    textAlign: "left",
-                                  },
-                                ]}
-                              >
-                                {new Date(item.createdAt).toLocaleDateString()}
+                              <Text style={[styles.tileFooterDate, isRTL && { textAlign: "left" }]}>
+                                {new Date(item.createdAt).toLocaleDateString(locale === 'fa' ? 'fa-AF' : (locale === 'ps' ? 'ps-AF' : 'en-US'))}
                               </Text>
                             </View>
                           );
                         })}
                       </ScrollView>
                     </View>
-                  ) : (
-                    <View style={styles.blankStateReviewBox}>
-                      <Ionicons
-                        name="chatbubbles-outline"
-                        size={18}
-                        color="#BBB"
-                      />
-
-                      <Text style={styles.blankStateReviewText}>
-                        No reviews yet. Be the first to rate this piece.
-                      </Text>
-                    </View>
                   )}
                 </View>
               )}
             </View>
 
-            {/* SIMILAR PRODUCTS */}
-            <Text
-              style={[
-                styles.crossSellCarouselTitle,
-                isRTL && { textAlign: "right" },
-              ]}
-            >
-              {(t("justForYou") || "YOU MIGHT ALSO LIKE").toUpperCase()}
+            {/* 🎯 PLACED PERMANENTLY OUTSIDE THE TABS HOUSING SWITCHER */}
+            <Text style={[styles.crossSellCarouselTitle, isRTL && { textAlign: "right" }]}>
+              {(t('youMightLike') || 'YOU MIGHT ALSO LIKE').toUpperCase()}
             </Text>
 
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={[
-                isRTL && { flexDirection: "row-reverse" },
-              ]}
               style={styles.crossSellCarouselScroll}
+              contentContainerStyle={isRTL ? { flexDirection: "row-reverse" } : undefined}
             >
               {similarProducts.map((item: any) => {
-                const itemPrice = Math.round(
-                  parseFloat(item.usdPrice || "0") *
-                    parseFloat(settings?.usdToAfnRate || "65") *
-                    (1 + parseFloat(settings?.profitPercentage || "20") / 100),
-                );
+                const itemUsd = parseFloat(item.usdPrice || "0");
+                const appRate = parseFloat(settings?.usdToAfnRate || "68");
+                const appMargin = parseFloat(settings?.profitPercentage || "20");
+                const itemFinalPrice = Math.round(itemUsd * appRate * (1 + appMargin / 100));
 
                 return (
                   <TouchableOpacity
                     key={`cross-sell-${item.id}`}
                     style={styles.crossSellCardTile}
-                    onPress={() => router.replace(`/product/${item.id}`)}
+                    onPress={() => router.replace(`product/${item.id}`)}
                   >
-                    <Image
-                      source={{ uri: item.imageUrl }}
-                      style={styles.crossSellThumbImage}
-                    />
-
-                    <Text style={styles.crossSellItemName} numberOfLines={1}>
+                    <Image source={{ uri: item.imageUrl }} style={styles.crossSellThumbImage} />
+                    <Text style={[styles.crossSellItemName, isRTL && { textAlign: "right" }] } numberOfLines={1}>
                       {item.name?.toUpperCase()}
                     </Text>
-
-                    <Text style={styles.crossSellItemPrice}>
-                      AFN {itemPrice.toLocaleString()}
+                    <Text style={[styles.crossSellItemPrice, isRTL && { textAlign: "right" }]}>
+                      AFN {itemFinalPrice.toLocaleString()}
                     </Text>
                   </TouchableOpacity>
                 );
               })}
             </ScrollView>
+
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* FOOTER */}
+      {/* 🎯 RESTORED ADD TO CART FUNCTIONALITY CONTROLLER */}
       <View style={styles.stickyFooterBar}>
-        <TouchableOpacity
-          style={styles.callToBagBtn}
-          onPress={addToCart}
-          activeOpacity={0.9}
+        <TouchableOpacity 
+          style={styles.callToBagBtn} 
+          onPress={() => addToCart()} 
+          activeOpacity={0.8}
         >
-          <Ionicons
-            name="bag-handle-outline"
-            size={15}
-            color="#FFF"
-            style={{ marginRight: 8 }}
-          />
-
+          <Ionicons name="bag-handle-outline" size={16} color="#FFF" style={{ marginRight: 8 }} />
           <Text style={styles.callToBagBtnText}>
-            {(t("addToCart") || "ADD TO BAG").toUpperCase()}
+            {(t('addToBag') || 'ADD TO BAG').toUpperCase()}
           </Text>
         </TouchableOpacity>
       </View>
@@ -692,23 +618,38 @@ const handlePickAndUploadImage = async () => {
   );
 }
 
+
 const styles = StyleSheet.create({
+  masterRootViewContainer: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+    position: "relative",
+  },
   container: { flex: 1, backgroundColor: "#FFFFFF" },
   center: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#FFF",
+    minHeight: 400,
   },
   scroll: { flex: 1 },
 
-  // Image Framework
+  // 🎯 THE CRITICAL CONFIGURATION FIX: Re-declared missing layout style rule parameter!
+  // This provides padding cushion space so products do not get stuck beneath your sticky add to bag tray footer
+  scrollContentContainer: {
+    paddingBottom: 120,
+  },
+
   imageFrameWrapper: {
     width: "100%",
-    aspectRatio: 3 / 4,
+    height: 420,
     position: "relative",
-    backgroundColor: "#FAFAFA",
+    backgroundColor: "#F9F9F9",
   },
+
+  blockedscrollContentContainer: { paddingBottom: 120 },
+
   productMediaImage: { width: "100%", height: "100%" },
   navCircleBtn: {
     position: "absolute",
@@ -716,115 +657,31 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: "rgba(255, 255, 255, 0.95)",
+    backgroundColor: "rgba(255,255,255,0.8)",
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 3,
+    zIndex: 10,
   },
-
-  // Information layouts
-  infoContainer: { paddingHorizontal: 16, paddingTop: 20 },
+  infoContainer: { paddingHorizontal: 20, paddingTop: 20 },
   priceHeadlineRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 6,
-  },
-  viewAllTriggerLinkText: {
-    fontSize: 10,
-    color: "#666666",
-    fontWeight: "600",
-    letterSpacing: 0.5,
-  },
-
-  photoUploadStrip: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 12,
-    gap: 10,
-  },
-
-  uploadBoxBtn: {
-    width: 88,
-    height: 88,
-    borderWidth: 1,
-    borderColor: "#E5E5E5",
-    borderStyle: "dashed",
-    borderRadius: 4,
-    backgroundColor: "#FFFFFF",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  uploadBoxText: {
-    fontSize: 9,
-    color: "#333333",
-    fontWeight: "700",
-    marginTop: 4,
-    letterSpacing: 0.5,
-  },
-
-  uploadedPreviewThumb: {
-    width: 88,
-    height: 88,
-    borderRadius: 4,
-    backgroundColor: "#F5F5F5",
-  },
-
-  previewReviewsSection: {
-    marginTop: 8,
-  },
-
-  previewHeaderRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 10,
   },
-
-  previewTitle: {
-    fontSize: 11,
-    fontWeight: "800",
-    color: "#111111",
-    letterSpacing: 1,
-  },
-
-  attachedImagesRow: {
-    flexDirection: "row",
-    marginTop: 8,
-    gap: 6,
-  },
-
-  attachedReviewThumb: {
-    width: 46,
-    height: 46,
-    borderRadius: 4,
-    backgroundColor: "#EEEEEE",
-  },
-  currencyRetailPrice: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: "#000000",
-    letterSpacing: 0.5,
-  },
+  currencyRetailPrice: { fontSize: 24, fontWeight: "900", color: "#000" },
   productBrandName: {
-    fontSize: 13,
-    color: "#333333",
-    fontWeight: "500",
-    letterSpacing: 1.2,
-    lineHeight: 18,
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#333",
+    letterSpacing: 0.5,
+    lineHeight: 20,
   },
   dividerHairline: {
-    height: 1,
-    backgroundColor: "#F0F0F0",
-    marginVertical: 18,
+    height: 0.5,
+    backgroundColor: "#EFEFEF",
+    marginVertical: 15,
   },
-
-  // Size selectors
   sizeMatrixHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -833,168 +690,209 @@ const styles = StyleSheet.create({
   },
   sizeSectionTitle: {
     fontSize: 11,
-    fontWeight: "700",
-    color: "#000000",
+    fontWeight: "900",
+    color: "#000",
     letterSpacing: 1,
   },
   sizeGuideLabelText: {
     fontSize: 10,
-    fontWeight: "600",
-    color: "#777777",
+    fontWeight: "800",
+    color: "#999",
     textDecorationLine: "underline",
-    letterSpacing: 0.5,
   },
-  sizeGridWrapper: { flexDirection: "row", gap: 10 },
+  sizeGridWrapper: { flexDirection: "row", gap: 12, marginBottom: 20 },
   sizeItemBox: {
     flex: 1,
-    height: 40,
+    height: 44,
     borderWidth: 1,
-    borderColor: "#E5E5E5",
+    borderColor: "#EFEFEF",
     justifyContent: "center",
     alignItems: "center",
-    borderRadius: 2,
   },
-  sizeItemBoxActive: { borderColor: "#000000", backgroundColor: "#000000" },
-  sizeText: { fontSize: 11, fontWeight: "600", color: "#555555" },
-  sizeTextActive: { color: "#FFFFFF", fontWeight: "700" },
-
-  // Segmentation tabs
+  sizeItemBoxActive: { backgroundColor: "#000", borderColor: "#000" },
+  sizeText: { fontSize: 13, fontWeight: "800", color: "#555" },
+  sizeTextActive: { color: "#FFF" },
   segmentTabBar: {
     flexDirection: "row",
     borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
-    marginTop: 26,
-    gap: 24,
+    borderBottomColor: "#F5F5F5",
+    marginBottom: 15,
   },
-  segmentTabBtn: { paddingBottom: 10, position: "relative" },
-  segmentTabBtnActive: { borderBottomWidth: 2, borderBottomColor: "#000000" },
+  segmentTabBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: "center",
+    borderBottomWidth: 2,
+    borderBottomColor: "transparent",
+  },
+  segmentTabBtnActive: { borderBottomColor: "#000" },
   segmentTabText: {
     fontSize: 11,
-    fontWeight: "600",
-    color: "#999999",
+    fontWeight: "800",
+    color: "#999",
     letterSpacing: 1,
   },
-  segmentTabTextActive: { color: "#000000", fontWeight: "800" },
-  tabContentViewWrapper: { paddingTop: 16, minHeight: 120 },
+  segmentTabTextActive: { color: "#000", fontWeight: "900" },
+  tabContentViewWrapper: { minHeight: 120, marginBottom: 10 },
   bodyDescriptionText: {
-    fontSize: 12,
-    color: "#444444",
+    fontSize: 13,
+    color: "#444",
     lineHeight: 20,
-    letterSpacing: 0.4,
+    fontWeight: "500",
   },
-
-  // Reviews Module
   reviewFormCard: {
     backgroundColor: "#FAFAFA",
-    padding: 14,
-    borderRadius: 2,
-    marginBottom: 16,
-  },
-  formSectionTitle: {
-    fontSize: 10,
-    fontWeight: "700",
-    letterSpacing: 1,
-    color: "#222",
-  },
-  starsFormRow: { flexDirection: "row", marginVertical: 8 },
-  commentInputField: {
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#EAEAEA",
-    borderRadius: 2,
-    padding: 10,
-    fontSize: 12,
-    minHeight: 60,
-    textAlignVertical: "top",
-  },
-  submitButtonBlock: {
-    backgroundColor: "#111111",
-    height: 36,
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: 10,
-    borderRadius: 2,
-  },
-  submitButtonText: {
-    color: "#FFFFFF",
-    fontSize: 10,
-    fontWeight: "700",
-    letterSpacing: 1,
-  },
-
-  horizontalReviewsScrollWrapper: { flexDirection: "row", marginVertical: 8 },
-  horizontalReviewTile: {
-    width: width * 0.7,
-    backgroundColor: "#FAFAFA",
-    padding: 12,
-    marginRight: 12,
-    borderRadius: 2,
+    padding: 16,
     borderWidth: 1,
     borderColor: "#F0F0F0",
+    marginBottom: 20,
+  },
+  formSectionTitle: {
+    fontSize: 9,
+    fontWeight: "900",
+    color: "#000",
+    letterSpacing: 1,
+    marginBottom: 5,
+  },
+  starsFormRow: { flexDirection: "row", marginBottom: 10 },
+  commentInputField: {
+    borderBottomWidth: 1,
+    borderBottomColor: "#DDD",
+    paddingVertical: 8,
+    fontSize: 13,
+    color: "#000",
+    marginBottom: 12,
+  },
+  photoUploadStrip: {
+    flexDirection: "row",
+    gap: 12,
+    alignItems: "center",
+    marginBottom: 15,
+  },
+  uploadBoxBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: "#DDD",
+    borderStyle: "dashed",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  uploadBoxText: { fontSize: 9, fontWeight: "800", color: "#555" },
+  uploadedPreviewThumb: { width: 35, height: 45, backgroundColor: "#EEE" },
+  submitButtonBlock: {
+    backgroundColor: "#000",
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  submitButtonText: {
+    color: "#FFF",
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 1,
+  },
+  previewReviewsSection: {
+    borderTopWidth: 1,
+    borderTopColor: "#F5F5F5",
+    paddingTop: 15,
+    marginBottom: 15,
+  },
+  previewHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  previewTitle: { fontSize: 11, fontWeight: "900", color: "#000" },
+  viewAllTriggerLinkText: {
+    fontSize: 10,
+    fontWeight: "900",
+    textDecorationLine: "underline",
+    color: "#000",
+  },
+  horizontalReviewsScrollWrapper: { flexDirection: "row", marginVertical: 5 },
+  horizontalReviewTile: {
+    width: 260,
+    backgroundColor: "#FAFAFA",
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "#F0F0F0",
+    marginRight: 15,
   },
   tileHeaderRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 6,
+    marginBottom: 8,
   },
-  buyerNameText: { fontSize: 11, fontWeight: "700", color: "#333" },
+  buyerNameText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#111",
+    flex: 1,
+    marginRight: 5,
+  },
   starsRowWrap: { flexDirection: "row" },
   buyerCommentParagraph: {
-    fontSize: 11,
-    color: "#555555",
+    fontSize: 12,
+    color: "#555",
     lineHeight: 16,
     height: 48,
   },
-  tileFooterDate: { fontSize: 9, color: "#AAAAAA", marginTop: 4 },
+  attachedImagesRow: { flexDirection: "row", gap: 6, marginVertical: 8 },
+  attachedReviewThumb: { width: 40, height: 50, backgroundColor: "#EEE" },
+  tileFooterDate: {
+    fontSize: 8,
+    color: "#999",
+    marginTop: 4,
+    fontWeight: "700",
+  },
   blankStateReviewBox: { alignItems: "center", paddingVertical: 20, gap: 6 },
-  blankStateReviewText: { fontSize: 11, color: "#999999" },
-
-  // Cross Sells
-  crossSellCarouselTitle: {
-    fontSize: 11,
-    fontWeight: "800",
-    letterSpacing: 2,
-    marginTop: 24,
-    marginBottom: 14,
+  blankStateReviewText: { fontSize: 11, color: "#BBB", fontWeight: "600" },
+  crossSellCarouselScroll: {
+    flexDirection: "row",
+    marginTop: 12,
+    marginBottom: 40,
   },
-  crossSellCarouselScroll: { flexDirection: "row", marginBottom: 100 },
-  crossSellCardTile: { width: (width - 44) / 3, marginRight: 12 },
-  crossSellThumbImage: {
-    width: "100%",
-    aspectRatio: 3 / 4,
-    backgroundColor: "#FAFAFA",
-    borderRadius: 2,
-  },
+  crossSellCardTile: { width: 160, marginRight: 18 },
+  crossSellThumbImage: { width: 160, height: 210, backgroundColor: "#F8F8F8" },
   crossSellItemName: {
-    fontSize: 9,
-    fontWeight: "500",
-    color: "#333",
-    marginTop: 6,
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#222222",
+    marginTop: 8,
   },
   crossSellItemPrice: {
-    fontSize: 10,
-    fontWeight: "700",
-    color: "#000",
-    marginTop: 2,
+    fontSize: 13,
+    fontWeight: "900",
+    color: "#000000",
+    marginTop: 3,
   },
-
-  // Sticky Footers
-  stickyFooterBar: {
+  crossSellCarouselTitle: {
+    fontSize: 11,
+    fontWeight: "900",
+    color: "#000",
+    letterSpacing: 1.5,
+    marginTop: 15,
+  },
+  // 🎯 THE SECURED FIX: Permanently floating on the absolute base wrapper window
+  layoutstickyFooterBar: {
     position: "absolute",
-    bottom: 0,
+    bottom: Platform.OS === "ios" ? 44 : 0,
     left: 0,
     right: 0,
-    backgroundColor: "#FFFFFF",
-    paddingHorizontal: 16,
-    paddingBottom: Platform.OS === "ios" ? 28 : 14,
-    paddingTop: 12,
+    height: 75,
     borderTopWidth: 1,
     borderTopColor: "#F5F5F5",
+    paddingHorizontal: 20,
+    justifyContent: "center",
+    backgroundColor: "#FFFFFF",
+    zIndex: 100,
   },
   callToBagBtn: {
     backgroundColor: "#000000",
-    height: 46,
+    height: 48,
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
@@ -1003,7 +901,7 @@ const styles = StyleSheet.create({
   callToBagBtnText: {
     color: "#FFFFFF",
     fontSize: 12,
-    fontWeight: "800",
+    fontWeight: "900",
     letterSpacing: 1.5,
   },
 });

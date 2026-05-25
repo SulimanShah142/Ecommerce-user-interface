@@ -15,5 +15,5 @@
     "../admin-panel/drizzle.config.ts",
     ".expo/types/**/*.ts",
     "expo-env.d.ts"
-  ]
+, "Contexts/LanguageContext.tsx"  ]
 }

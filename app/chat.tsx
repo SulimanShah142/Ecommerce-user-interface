@@ -15,9 +15,10 @@ import {
 import { uploadImage } from '../lib/uploadthing';
 import { authClient } from '@/lib/auth-client';
 import { useLanguage } from '@/Contexts/LanguageContext';
+import {useBottomTabBarHeight} from "@react-navigation/bottom-tabs";
 
 const { width } = Dimensions.get('window');
-const API_URL = 'http://192.168.1.3:8787';
+const API_URL = 'https://brand-gallery-backend.brand-gallery.workers.dev';
 
 export default function ChatScreen() {
   const params = useLocalSearchParams();
@@ -177,7 +178,41 @@ export default function ChatScreen() {
     }
   };
 
-  const renderMessageItem = ({ item }: { item: any }) => {
+const [keyboardPadding, setKeyboardPadding] = useState(0);
+  
+  // 🎯 FIX 2: Safely read native tab bar layout offset depth
+  let tabBarHeight = 0;
+  try {
+    tabBarHeight = useBottomTabBarHeight();
+  } catch (e) {
+    tabBarHeight = 0; // Fallback helper if screen loads outside tabs structure
+  }
+
+  useEffect(() => {
+    // 🎯 FIX 3: Run tracking on both platforms to override buggy default Tab container behavior
+    const showListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow', 
+      (e) => {
+        // Subtract layout tab bar height from the software keyboard height matrix
+        const calculatedPadding = e.endCoordinates.height - (Platform.OS === 'android' ? tabBarHeight : 0);
+        setKeyboardPadding(calculatedPadding > 0 ? calculatedPadding : 0);
+      }
+    );
+    
+    const hideListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide', 
+      () => {
+        setKeyboardPadding(0);
+      }
+    );
+
+    return () => {
+      showListener.remove();
+      hideListener.remove();
+    };
+  }, [tabBarHeight]);
+
+  const renderMessageItem = ({ item }) => {
     const isMine = item.senderId === activeUserId;
     return (
       <View style={[styles.msgContainer, isMine ? styles.myMsgAlign : styles.theirMsgAlign]}>
@@ -208,89 +243,84 @@ export default function ChatScreen() {
   }
 
   return (
-    // 🎯 FIX 1: Use safe-area wrappers inside container frames to establish boundaries
     <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView 
-        style={{ flex: 1 }} 
-        // 🎯 FIX 2: Android handles keyboard natively using windowTranslucent adjustments, iOS requires precise padding calculations
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        // 🎯 FIX 3: Dynamic vertical offset matching navigation header depth
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0} 
-      >
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-          <View style={{ flex: 1 }}>
-            
-            {/* HIGH-END BLACK/WHITE EDITORIAL HEADER */}
-            <View style={[styles.header, isRTL && { flexDirection: 'row-reverse' }]}>
-              <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                <Ionicons name={isRTL ? "arrow-forward" : "arrow-back"} size={20} color="#000000" />
-              </TouchableOpacity>
-              <View style={styles.titleWrapper}>
-                <Text style={styles.headerTitle}>BRAND GALLERY SUPPORT</Text>
-                <Text style={styles.headerSubtitle}>ONLINE ASSISTANCE CHANNEL</Text>
-              </View>
-              <View style={styles.headerActionSlot}>
-                {historyLoading && <ActivityIndicator size="small" color="#000000" />}
-              </View>
+      {/* HIGH-END BLACK/WHITE EDITORIAL HEADER */}
+      <View style={[styles.header, isRTL && { flexDirection: 'row-reverse' }]}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <Ionicons name={isRTL ? "arrow-back" : "arrow-forward"} size={20} color="#000000" />
+        </TouchableOpacity>
+        <View style={styles.titleWrapper}>
+          <Text style={styles.headerTitle}>BRAND GALLERY SUPPORT</Text>
+          <Text style={styles.headerSubtitle}>ONLINE ASSISTANCE CHANNEL</Text>
+        </View>
+        <View style={styles.headerActionSlot}>
+          {historyLoading && <ActivityIndicator size="small" color="#000000" />}
+        </View>
+      </View>
+
+      {/* 🎯 FIX 4: Replaced KeyboardAvoidingView with a dynamic layout padding frame */}
+     <KeyboardAvoidingView
+  style={{ flex: 1 }}
+  behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+  keyboardVerticalOffset={Platform.OS === 'android' ? tabBarHeight : 0}
+>
+        {historyLoading && (
+  <View style={styles.historyLoader}>
+    <ActivityIndicator size="large" color="#000000" />
+  </View>
+)}
+        {/* CHAT MESSAGES LOG RUNNER */}
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          keyExtractor={(item) => item.id?.toString()}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.listContainer}
+          renderItem={renderMessageItem}
+          keyboardShouldPersistTaps="handled"
+          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+          ListEmptyComponent={() => (
+            <View style={styles.emptyContainer}>
+              <Ionicons name="chatbubble-ellipses-outline" size={32} color="#CCCCCC" />
+              <Text style={styles.emptyText}>Start a dialogue with our styling desk.</Text>
             </View>
+          )}
+        />
 
-            {/* CHAT MESSAGES LOG RUNNER */}
-            <FlatList
-              ref={flatListRef}
-              data={messages}
-              keyExtractor={(item) => item.id?.toString()}
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.listContainer}
-              renderItem={renderMessageItem}
-              // 🎯 FIX 4: Ensure touches inside list register immediately and don't conflict with keyboard dismiss
-              keyboardShouldPersistTaps="handled"
-              onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-              ListEmptyComponent={() => (
-                <View style={styles.emptyContainer}>
-                  <Ionicons name="chatbubble-ellipses-outline" size={32} color="#CCCCCC" />
-                  <Text style={styles.emptyText}>Start a dialogue with our styling desk.</Text>
-                </View>
-              )}
-            />
+        {/* FLOATING TEXT INPUT DOCK COMPONENT */}
+        <View style={[styles.inputDockContainer, isRTL && { flexDirection: 'row-reverse' }]}>
+          <TouchableOpacity style={styles.attachBtn} onPress={pickImage} activeOpacity={0.7}>
+            <Ionicons name="camera-outline" size={20} color="#000000" />
+          </TouchableOpacity>
+          
+          <TextInput
+            style={[styles.inputField, isRTL && { textAlign: 'right' }]}
+            placeholder={t('typeMessage') || "Type your inquiry..."}
+            placeholderTextColor="#999999"
+            value={input}
+            onChangeText={setInput}
+            multiline={false}
+            onSubmitEditing={() => handleSend()}
+            returnKeyType="send"
+          />
 
-            {/* FLOATING TEXT INPUT DOCK COMPONENT */}
-            <View style={[styles.inputDockContainer, isRTL && { flexDirection: 'row-reverse' }]}>
-              <TouchableOpacity style={styles.attachBtn} onPress={pickImage} activeOpacity={0.7}>
-                <Ionicons name="camera-outline" size={20} color="#000000" />
-              </TouchableOpacity>
-              
-              <TextInput
-                style={[styles.inputField, isRTL && { textAlign: 'right' }]}
-                placeholder={t('typeMessage') || "Type your inquiry..."}
-                placeholderTextColor="#999999"
-                value={input}
-                onChangeText={setInput}
-                multiline={false}
-                onSubmitEditing={() => handleSend()}
-                returnKeyType="send"
-              />
-
-              <TouchableOpacity 
-                style={[styles.sendBtn, !input.trim() && { opacity: 0.3 }]} 
-                onPress={() => handleSend()}
-                disabled={!input.trim() || isSending}
-                activeOpacity={0.8}
-              >
-                {isSending ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <Ionicons name={isRTL ? "arrow-back" : "arrow-forward"} size={16} color="#FFFFFF" />
-                )}
-              </TouchableOpacity>
-            </View>
-
-          </View>
-        </TouchableWithoutFeedback>
-      </KeyboardAvoidingView>
+          <TouchableOpacity 
+            style={[styles.sendBtn, !input.trim() && { opacity: 0.3 }]} 
+            onPress={() => handleSend()}
+            disabled={!input.trim() || isSending}
+            activeOpacity={0.8}
+          >
+            {isSending ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Ionicons name={isRTL ? "arrow-back" : "arrow-forward"} size={16} color="#FFFFFF" />
+            )}
+          </TouchableOpacity>
+        </View>
+   </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FFFFFF' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFFFFF' },
@@ -331,18 +361,19 @@ const styles = StyleSheet.create({
   myTimestamp: { color: '#AAAAAA' },
   theirTimestamp: { color: '#999999' },
 
-  inputDockContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    // 🎯 FIX 5: Normalizes standard screen edge spacings when keyboard is dropped
-    paddingBottom: Platform.OS === 'ios' ? 14 : 14, 
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
-    borderTopColor: '#F5F5F5',
-    gap: 12
-  },
+inputDockContainer: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  paddingHorizontal: 16,
+  paddingTop: 12,
+  // 🎯 THE FIX: Force strict padding value equivalence to protect container heights
+  paddingBottom: 12, 
+  backgroundColor: '#FFFFFF',
+  borderTopWidth: 1,
+  borderTopColor: '#F5F5F5',
+  gap: 12
+},
+
   attachBtn: {
     width: 38,
     height: 38,
@@ -373,7 +404,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center'
   },
-
+historyLoader: {
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 70,
+  justifyContent: 'center',
+  alignItems: 'center',
+  zIndex: 10,
+  backgroundColor: 'rgba(255,255,255,0.7)',
+},
   emptyContainer: { alignItems: 'center', marginTop: 140, gap: 10 },
   emptyText: { fontSize: 11, color: '#999999', fontWeight: '500', letterSpacing: 0.5 }
 });

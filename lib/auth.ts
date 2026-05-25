@@ -21,7 +21,7 @@ export const auth = betterAuth({
     trustedOrigins: [
         "userapp://", 
         "exp://", 
-        "http://192.168.1.3:8787",
+        "https://brand-gallery-backend.brand-gallery.workers.dev",
     ],
     // server/auth.ts
 plugins: [
