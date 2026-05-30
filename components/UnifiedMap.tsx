@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useMemo, useRef, useEffect, useState } from 'react';
-import { View, StyleSheet, ActivityIndicator, Platform, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, ActivityIndicator, Platform, TouchableOpacity, Dimensions } from 'react-native';
 import { WebView } from 'react-native-webview';
 
 type UnifiedMapProps = {
@@ -22,7 +22,8 @@ export default function UnifiedMap({
 }: UnifiedMapProps) {
   const webViewRef = useRef<WebView>(null);
   const [loading, setLoading] = useState(true);
-const [isFullscreen, setisFullscreen] = useState(false)
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
   // 1. EXTRACT EXPLICIT COORDINATES WITH STABLE DEFAULT FALLBACKS
   const whLat = warehouseCoords[0];
   const whLng = warehouseCoords[1];
@@ -47,6 +48,18 @@ const [isFullscreen, setisFullscreen] = useState(false)
     }
   }, [drvLat, drvLng, hasDriver]);
 
+  // Dynamic map canvas dimensions redraw sync
+  useEffect(() => {
+    if (!loading) {
+      webViewRef.current?.injectJavaScript(`
+        if (typeof map !== 'undefined') {
+          map.invalidateSize();
+        }
+        true;
+      `);
+    }
+  }, [isFullscreen, loading]);
+
   const handleMessage = (event: any) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
@@ -56,7 +69,6 @@ const [isFullscreen, setisFullscreen] = useState(false)
     }
   };
 
-  // 3. ENCLOSED LEAFLET STRUCTURAL HTML GENERATION ENGINE
   // 3. ENCLOSED LEAFLET STRUCTURAL HTML GENERATION ENGINE
   const mapHtml = useMemo(() => {
     return `
@@ -83,17 +95,34 @@ const [isFullscreen, setisFullscreen] = useState(false)
             overflow: hidden !important;
             background-color: #FAFAFA;
           }
-          #map { height: 100vh; width: 100vw; background: #e0e0e0; }
+   #map {
+  height: 100vh;
+  width: 100vw;
+  background: #e0e0e0;
+
+  touch-action: auto !important;
+}
+  .leaflet-container {
+  touch-action: auto !important;
+}
           .icon-label { font-size: 24px; text-align: center; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.3)); }
         </style>
       </head>
       <body>
         <div id="map"></div>
         <script>
-          var map = L.map('map', { 
-            zoomControl: false, 
-            attributionControl: false 
-          }).setView([${centerLat}, ${centerLng}], 13);
+         var map = L.map('map', {
+  zoomControl: false,
+  attributionControl: false,
+
+  dragging: true,
+  tap: true,
+  touchZoom: true,
+  doubleClickZoom: true,
+  scrollWheelZoom: true,
+  boxZoom: true,
+  keyboard: false
+}).setView([${centerLat}, ${centerLng}], 13);
           
           L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
             maxZoom: 20
@@ -198,22 +227,41 @@ const [isFullscreen, setisFullscreen] = useState(false)
       </html>
     `;
   }, [role, whLat, whLng, destLat, destLng, drvLat, drvLng, hasDriver, hasWarehouse, hasDest, centerLat, centerLng]);
-
   return (
     <View style={[styles.container, isFullscreen && styles.fullscreenContainer]}>
       
-      {/* NATIVE INTERFACE WEB VIEW BROWSING BRIDGE */}
-      <WebView
-        ref={webViewRef}
-        originWhitelist={['*']}
-        source={{ html: mapHtml }}
-        onLoadEnd={() => setLoading(false)}
-        onMessage={handleMessage}
-        javaScriptEnabled={true}
-        domStorageEnabled={true}
-        style={styles.map}
-      />
+      {/* 🎯 FLOATING BACK EXIT ACTION BUTTON (Only pops up during full screen maps mode) */}
+      {isFullscreen && (
+        <TouchableOpacity 
+          style={styles.fullscreenCloseFloatingBtn}
+          activeOpacity={0.8}
+          onPress={() => setIsFullscreen(false)}
+        >
+          <Ionicons name="arrow-back-sharp" size={22} color="#000000" />
+        </TouchableOpacity>
+      )}
 
+      {/* NATIVE INTERFACE WEB VIEW BROWSING BRIDGE */}
+     <WebView
+  ref={webViewRef}
+  originWhitelist={['*']}
+  source={{ html: mapHtml }}
+  onLoadEnd={() => setLoading(false)}
+  onMessage={handleMessage}
+  javaScriptEnabled={true}
+  domStorageEnabled={true}
+
+  /* 🎯 CRITICAL FIX */
+  nestedScrollEnabled={true}
+
+  /* 🎯 PREVENT PARENT SCROLLVIEW FROM STEALING TOUCH */
+  scrollEnabled={false}
+
+  /* 🎯 ALLOW MAP GESTURES */
+  androidLayerType="hardware"
+
+  style={styles.map}
+/>
       {/* FLOATING MAP CONTROLS */}
       {!loading && (
         <View style={styles.floatingControlsGroup}>
@@ -276,24 +324,46 @@ const [isFullscreen, setisFullscreen] = useState(false)
   );
 }
 
-// 🎯 INDUSTRIAL STUDIO VIEW STYLESHEET WITH FULL PILL DESIGNERS
+// 🎯 CLEANLY RE-STRUCTURED MONOCHROME STYLESHEET MATRIX
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#E0E0E0',
     position: 'relative'
   },
+  // THE FULLSCREEN CONTAINER MATRIX OVERLAY
   fullscreenContainer: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    width: '100%',
-    height: '100%',
-    zIndex: 9999,
-    elevation: 9999,
+    width: Dimensions.get('window').width,
+    height: Dimensions.get('window').height,
+    zIndex: 99999, 
+    elevation: 99999,
     backgroundColor: '#FFFFFF'
+  },
+  // FLOATING MINIMALIST MONOCHROME BACK ARROW ACTION BUTTON LINK
+  fullscreenCloseFloatingBtn: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 55 : 30,
+    left: 20,
+    zIndex: 100000,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#EFEFEF',
+    elevation: 6,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4
   },
   map: {
     flex: 1,
@@ -320,7 +390,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.15,
     shadowRadius: 4,
-    zIndex: 1000
+    zIndex: 100000
   },
   controlPillBtn: {
     width: 38,

@@ -21,7 +21,7 @@ import * as ImagePicker from "expo-image-picker"; // 🎯 NEEDED FOR GALLERY HAR
 import { uploadImage } from "@/lib/uploadthing"; // 🎯 POINTS DIRECTLY TO YOUR REAL UPLOADTHING HELPERS UTILITY FILE
 import * as ImageManipulator from "expo-image-manipulator"; // 🎯 ENSURE THIS IS IMPORTED
 
-const API_URL = "https://brand-gallery-backend.brand-gallery.workers.dev";
+const API_URL = "http://192.168.1.3:8787";
 const { width } = Dimensions.get("window");
 export default function UserProductDetails() {
   const { id } = useLocalSearchParams();
@@ -271,10 +271,11 @@ export default function UserProductDetails() {
 
   return (
     <View style={styles.container}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={{ flex: 1 }}
-      >
+     <KeyboardAvoidingView
+    style={{ flex: 1 }}
+    behavior={Platform.OS === "ios" ? "padding" : "height"}
+    keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0}
+  >
         <ScrollView
           showsVerticalScrollIndicator={false}
           style={styles.scroll}
@@ -620,6 +621,271 @@ export default function UserProductDetails() {
 
 
 const styles = StyleSheet.create({
+  priceHeadlineRow: {
+  flexDirection: "row",
+  justifyContent: "space-between",
+  alignItems: "flex-start",
+  marginBottom: 8,
+},
+
+sizeTextActive: {
+  color: "#FFFFFF",
+  fontWeight: "900",
+},
+
+segmentTabBar: {
+  flexDirection: "row",
+  borderBottomWidth: 1,
+  borderBottomColor: "#F2F2F2",
+  marginBottom: 12,
+  marginTop: 2,
+},
+
+stickyFooterBar: {
+  position: "absolute",
+  bottom: Platform.OS === "ios" ? 28 : 0,
+  left: 0,
+  right: 0,
+  height: 64,
+  backgroundColor: "#FFFFFF",
+  borderTopWidth: 1,
+  borderTopColor: "#F3F3F3",
+  paddingHorizontal: 16,
+  justifyContent: "center",
+  zIndex: 999,
+  shadowColor: "#000",
+  shadowOffset: {
+    width: 0,
+    height: -2,
+  },
+  shadowOpacity: 0.04,
+  shadowRadius: 6,
+  elevation: 10,
+},
+  imageFrameWrapper: {
+  width: "100%",
+  height: 340, // was 420
+  position: "relative",
+  backgroundColor: "#F8F8F8",
+},
+
+infoContainer: {
+  paddingHorizontal: 16, // was 20
+  paddingTop: 16,
+},
+
+currencyRetailPrice: {
+  fontSize: 20, // was 24
+  fontWeight: "900",
+  color: "#000",
+},
+
+productBrandName: {
+  fontSize: 12, // was 14
+  fontWeight: "700",
+  color: "#333",
+  letterSpacing: 0.3,
+  lineHeight: 18,
+},
+
+dividerHairline: {
+  height: 0.5,
+  backgroundColor: "#EFEFEF",
+  marginVertical: 12, // was 15
+},
+
+sizeGridWrapper: {
+  flexDirection: "row",
+  gap: 8, // was 12
+  marginBottom: 16,
+},
+
+sizeItemBox: {
+  flex: 1,
+  height: 38, // was 44
+  borderWidth: 1,
+  borderColor: "#EFEFEF",
+  justifyContent: "center",
+  alignItems: "center",
+},
+
+sizeText: {
+  fontSize: 11, // was 13
+  fontWeight: "800",
+  color: "#555",
+},
+
+segmentTabBtn: {
+  flex: 1,
+  paddingVertical: 10, // was 12
+  alignItems: "center",
+  borderBottomWidth: 2,
+  borderBottomColor: "transparent",
+},
+
+segmentTabText: {
+  fontSize: 10, // was 11
+  fontWeight: "800",
+  color: "#999",
+  letterSpacing: 0.8,
+},
+
+tabContentViewWrapper: {
+  minHeight: 90, // was 120
+  marginBottom: 6,
+},
+
+bodyDescriptionText: {
+  fontSize: 12, // was 13
+  color: "#444",
+  lineHeight: 18,
+  fontWeight: "500",
+},
+
+reviewFormCard: {
+  backgroundColor: "#FAFAFA",
+  padding: 12, // was 16
+  borderWidth: 1,
+  borderColor: "#F0F0F0",
+  marginBottom: 16,
+},
+
+commentInputField: {
+  borderBottomWidth: 1,
+  borderBottomColor: "#DDD",
+  paddingVertical: 6,
+  fontSize: 12,
+  color: "#000",
+  marginBottom: 10,
+},
+
+photoUploadStrip: {
+  flexDirection: "row",
+  gap: 8,
+  alignItems: "center",
+  marginBottom: 12,
+},
+
+uploadBoxBtn: {
+  paddingHorizontal: 10,
+  paddingVertical: 6,
+  borderWidth: 1,
+  borderColor: "#DDD",
+  borderStyle: "dashed",
+  flexDirection: "row",
+  alignItems: "center",
+  gap: 5,
+},
+
+uploadedPreviewThumb: {
+  width: 28, // was 35
+  height: 36, // was 45
+  backgroundColor: "#EEE",
+},
+
+submitButtonBlock: {
+  backgroundColor: "#000",
+  paddingVertical: 10, // was 12
+  alignItems: "center",
+},
+
+previewReviewsSection: {
+  borderTopWidth: 1,
+  borderTopColor: "#F5F5F5",
+  paddingTop: 12,
+  marginBottom: 12,
+},
+
+horizontalReviewTile: {
+  width: 210, // was 260
+  backgroundColor: "#FAFAFA",
+  padding: 10, // was 14
+  borderWidth: 1,
+  borderColor: "#F0F0F0",
+  marginRight: 10,
+},
+
+buyerNameText: {
+  fontSize: 10,
+  fontWeight: "800",
+  color: "#111",
+  flex: 1,
+  marginRight: 4,
+},
+
+buyerCommentParagraph: {
+  fontSize: 11,
+  color: "#555",
+  lineHeight: 15,
+  height: 40,
+},
+
+attachedImagesRow: {
+  flexDirection: "row",
+  gap: 4,
+  marginVertical: 6,
+},
+
+attachedReviewThumb: {
+  width: 32, // was 40
+  height: 40, // was 50
+  backgroundColor: "#EEE",
+},
+
+crossSellCardTile: {
+  width: 120, // was 160
+  marginRight: 12,
+},
+
+crossSellThumbImage: {
+  width: 120,
+  height: 160, // was 210
+  backgroundColor: "#F8F8F8",
+},
+
+crossSellItemName: {
+  fontSize: 10,
+  fontWeight: "800",
+  color: "#222222",
+  marginTop: 6,
+},
+
+crossSellItemPrice: {
+  fontSize: 11,
+  fontWeight: "900",
+  color: "#000000",
+  marginTop: 2,
+},
+
+layoutstickyFooterBar: {
+  position: "absolute",
+  bottom: Platform.OS === "ios" ? 30 : 0,
+  left: 0,
+  right: 0,
+  height: 64, // was 75
+  borderTopWidth: 1,
+  borderTopColor: "#F5F5F5",
+  paddingHorizontal: 16,
+  justifyContent: "center",
+  backgroundColor: "#FFFFFF",
+  zIndex: 100,
+},
+
+callToBagBtn: {
+  backgroundColor: "#000000",
+  height: 42, // was 48
+  flexDirection: "row",
+  justifyContent: "center",
+  alignItems: "center",
+  borderRadius: 2,
+},
+
+callToBagBtnText: {
+  color: "#FFFFFF",
+  fontSize: 11,
+  fontWeight: "900",
+  letterSpacing: 1.2,
+},
   masterRootViewContainer: {
     flex: 1,
     backgroundColor: "#FFFFFF",
@@ -641,12 +907,6 @@ const styles = StyleSheet.create({
     paddingBottom: 120,
   },
 
-  imageFrameWrapper: {
-    width: "100%",
-    height: 420,
-    position: "relative",
-    backgroundColor: "#F9F9F9",
-  },
 
   blockedscrollContentContainer: { paddingBottom: 120 },
 
@@ -662,26 +922,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     zIndex: 10,
   },
-  infoContainer: { paddingHorizontal: 20, paddingTop: 20 },
-  priceHeadlineRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  currencyRetailPrice: { fontSize: 24, fontWeight: "900", color: "#000" },
-  productBrandName: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#333",
-    letterSpacing: 0.5,
-    lineHeight: 20,
-  },
-  dividerHairline: {
-    height: 0.5,
-    backgroundColor: "#EFEFEF",
-    marginVertical: 15,
-  },
+ 
   sizeMatrixHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -700,53 +941,13 @@ const styles = StyleSheet.create({
     color: "#999",
     textDecorationLine: "underline",
   },
-  sizeGridWrapper: { flexDirection: "row", gap: 12, marginBottom: 20 },
-  sizeItemBox: {
-    flex: 1,
-    height: 44,
-    borderWidth: 1,
-    borderColor: "#EFEFEF",
-    justifyContent: "center",
-    alignItems: "center",
-  },
+  
   sizeItemBoxActive: { backgroundColor: "#000", borderColor: "#000" },
-  sizeText: { fontSize: 13, fontWeight: "800", color: "#555" },
-  sizeTextActive: { color: "#FFF" },
-  segmentTabBar: {
-    flexDirection: "row",
-    borderBottomWidth: 1,
-    borderBottomColor: "#F5F5F5",
-    marginBottom: 15,
-  },
-  segmentTabBtn: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: "center",
-    borderBottomWidth: 2,
-    borderBottomColor: "transparent",
-  },
+  
   segmentTabBtnActive: { borderBottomColor: "#000" },
-  segmentTabText: {
-    fontSize: 11,
-    fontWeight: "800",
-    color: "#999",
-    letterSpacing: 1,
-  },
+  
   segmentTabTextActive: { color: "#000", fontWeight: "900" },
-  tabContentViewWrapper: { minHeight: 120, marginBottom: 10 },
-  bodyDescriptionText: {
-    fontSize: 13,
-    color: "#444",
-    lineHeight: 20,
-    fontWeight: "500",
-  },
-  reviewFormCard: {
-    backgroundColor: "#FAFAFA",
-    padding: 16,
-    borderWidth: 1,
-    borderColor: "#F0F0F0",
-    marginBottom: 20,
-  },
+ 
   formSectionTitle: {
     fontSize: 9,
     fontWeight: "900",
@@ -755,49 +956,17 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   starsFormRow: { flexDirection: "row", marginBottom: 10 },
-  commentInputField: {
-    borderBottomWidth: 1,
-    borderBottomColor: "#DDD",
-    paddingVertical: 8,
-    fontSize: 13,
-    color: "#000",
-    marginBottom: 12,
-  },
-  photoUploadStrip: {
-    flexDirection: "row",
-    gap: 12,
-    alignItems: "center",
-    marginBottom: 15,
-  },
-  uploadBoxBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: "#DDD",
-    borderStyle: "dashed",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
+  
+  
   uploadBoxText: { fontSize: 9, fontWeight: "800", color: "#555" },
-  uploadedPreviewThumb: { width: 35, height: 45, backgroundColor: "#EEE" },
-  submitButtonBlock: {
-    backgroundColor: "#000",
-    paddingVertical: 12,
-    alignItems: "center",
-  },
+ 
   submitButtonText: {
     color: "#FFF",
     fontSize: 10,
     fontWeight: "900",
     letterSpacing: 1,
   },
-  previewReviewsSection: {
-    borderTopWidth: 1,
-    borderTopColor: "#F5F5F5",
-    paddingTop: 15,
-    marginBottom: 15,
-  },
+ 
   previewHeaderRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -812,36 +981,16 @@ const styles = StyleSheet.create({
     color: "#000",
   },
   horizontalReviewsScrollWrapper: { flexDirection: "row", marginVertical: 5 },
-  horizontalReviewTile: {
-    width: 260,
-    backgroundColor: "#FAFAFA",
-    padding: 14,
-    borderWidth: 1,
-    borderColor: "#F0F0F0",
-    marginRight: 15,
-  },
+ 
   tileHeaderRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 8,
   },
-  buyerNameText: {
-    fontSize: 11,
-    fontWeight: "800",
-    color: "#111",
-    flex: 1,
-    marginRight: 5,
-  },
+ 
   starsRowWrap: { flexDirection: "row" },
-  buyerCommentParagraph: {
-    fontSize: 12,
-    color: "#555",
-    lineHeight: 16,
-    height: 48,
-  },
-  attachedImagesRow: { flexDirection: "row", gap: 6, marginVertical: 8 },
-  attachedReviewThumb: { width: 40, height: 50, backgroundColor: "#EEE" },
+ 
   tileFooterDate: {
     fontSize: 8,
     color: "#999",
@@ -855,20 +1004,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     marginBottom: 40,
   },
-  crossSellCardTile: { width: 160, marginRight: 18 },
-  crossSellThumbImage: { width: 160, height: 210, backgroundColor: "#F8F8F8" },
-  crossSellItemName: {
-    fontSize: 12,
-    fontWeight: "800",
-    color: "#222222",
-    marginTop: 8,
-  },
-  crossSellItemPrice: {
-    fontSize: 13,
-    fontWeight: "900",
-    color: "#000000",
-    marginTop: 3,
-  },
+ 
   crossSellCarouselTitle: {
     fontSize: 11,
     fontWeight: "900",
@@ -877,31 +1013,5 @@ const styles = StyleSheet.create({
     marginTop: 15,
   },
   // 🎯 THE SECURED FIX: Permanently floating on the absolute base wrapper window
-  layoutstickyFooterBar: {
-    position: "absolute",
-    bottom: Platform.OS === "ios" ? 44 : 0,
-    left: 0,
-    right: 0,
-    height: 75,
-    borderTopWidth: 1,
-    borderTopColor: "#F5F5F5",
-    paddingHorizontal: 20,
-    justifyContent: "center",
-    backgroundColor: "#FFFFFF",
-    zIndex: 100,
-  },
-  callToBagBtn: {
-    backgroundColor: "#000000",
-    height: 48,
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    borderRadius: 2,
-  },
-  callToBagBtnText: {
-    color: "#FFFFFF",
-    fontSize: 12,
-    fontWeight: "900",
-    letterSpacing: 1.5,
-  },
+ 
 });

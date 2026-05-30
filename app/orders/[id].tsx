@@ -1,25 +1,27 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { View, Text, ScrollView, StyleSheet, Image, ActivityIndicator, TouchableOpacity, Dimensions, Platform } from 'react-native';
+import React, { useState, useEffect, useMemo } from 'react';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import UnifiedMap from '@/components/UnifiedMap';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLanguage } from '@/Contexts/LanguageContext';
+import UnifiedMap from '@/components/UnifiedMap';
 
-const { width } = Dimensions.get('window');
-const API_URL = "https://brand-gallery-backend.brand-gallery.workers.dev";
+const API_URL = "http://192.168.1.3:8787";
 
 export default function UserOrderDetails() {
   const { id } = useLocalSearchParams();
-  const { t, isRTL } = useLanguage();
+  const { t, isRTL, locale } = useLanguage();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+
   const [itemsExpanded, setItemsExpanded] = useState(false);
-  
   const [order, setOrder] = useState<any>(null);
   const [settings, setSettings] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [liveDriverCoords, setLiveDriverCoords] = useState<[number, number] | null>(null);
-  const webViewRef = React.useRef<any>(null);
-  // 1. DUAL PARALLEL DATA INITIALIZER
+  const [mapFullscreen, setMapFullscreen] = useState(false);
+
+  // 1. DATA INITIALIZATION: Parallel Resource Data Fetch Engine
   useEffect(() => {
     if (!id) return;
 
@@ -39,8 +41,13 @@ export default function UserOrderDetails() {
         setOrder(orderData);
         setSettings(settingsData);
 
+        // 🎯 FIX TYPE CASTING ON MOUNT: Parse server string decimals into pure coordinates floats cleanly
         if (orderData?.driverLat && orderData?.driverLng) {
-          setLiveDriverCoords([parseFloat(orderData.driverLat), parseFloat(orderData.driverLng)]);
+          const initLat = parseFloat(orderData.driverLat);
+          const initLng = parseFloat(orderData.driverLng);
+          if (!isNaN(initLat) && !isNaN(initLng)) {
+            setLiveDriverCoords([initLat, initLng]);
+          }
         }
       } catch (err) {
         console.error("❌ User App tracking data load failed:", err);
@@ -52,24 +59,42 @@ export default function UserOrderDetails() {
     loadCoreData();
   }, [id]);
 
-  // 2. LIVE COURIER TRACKING HEARTBEAT LOOP
+  // 2. 🎯 AUTOMATED HEARTBEAT TELEMETRY LOOP WITH CONVERSIONS
   useEffect(() => {
     let interval: NodeJS.Timeout;
 
-    if (order?.status === 'picked_up' || order?.status === 'confirmed') {
-      interval = setInterval(async () => {
+    // 🎯 THE TRACKING TIMELINE SYNC: Keeps fetching real-time telemetry coordinates for both milestones
+    const isLiveTrackingActive = order?.status === 'picked_up' || order?.status === 'confirmed';
+
+    if (isLiveTrackingActive) {
+      console.log(`📡 [USER APP] Initializing live telemetry worker stream for room status: ${order.status.toUpperCase()}`);
+
+      const pollLocation = async () => {
         try {
           const res = await fetch(`${API_URL}/api/orders/${id}/driver-location`);
           if (res.ok) {
             const data = await res.json();
-            if (data?.lat && data?.lng) {
-              setLiveDriverCoords([parseFloat(data.lat), parseFloat(data.lng)]);
+            
+            // Explicitly verify and convert numeric variables parameters types 
+            if (data?.lat !== null && data?.lng !== null) {
+              const nextLat = parseFloat(data.lat);
+              const nextLng = parseFloat(data.lng);
+
+              if (!isNaN(nextLat) && !isNaN(nextLng)) {
+                setLiveDriverCoords([nextLat, nextLng]);
+              }
             }
           }
         } catch (e) {
           console.log("⚠️ Driver location tracking snapshot fetch skipped:", e);
         }
-      }, 12000); 
+      };
+
+      // Poll once immediately on view state load to eliminate map rendering gaps
+      pollLocation();
+
+      // Configure clean 12-second high-precision polling snapshots
+      interval = setInterval(pollLocation, 12000); 
     }
 
     return () => {
@@ -90,407 +115,323 @@ export default function UserOrderDetails() {
     return (!isNaN(lat) && !isNaN(lng)) ? [lat, lng] : [34.5330, 69.1660]; 
   }, [settings]);
 
+  // 4. MEMOIZED MAP VIEW COMPONENT FRAME BLOCK
+  const MemoizedMapComponent = useMemo(() => {
+    return (
+      <UnifiedMap
+        role="USER"
+        destinationCoords={customerCoords}
+        warehouseCoords={warehouseCoords}
+        driverCoords={liveDriverCoords}
+        orderStatus={order?.status}
+        orderId={id as string}
+        isFullscreen={mapFullscreen}
+        setIsFullscreen={setMapFullscreen}
+      />
+    );
+  }, [customerCoords, warehouseCoords, liveDriverCoords, order?.status, id, mapFullscreen]);
+
+  // 5. 🎯 FINANCIALLY BALANCED RECAP INVOICE CALCULATIONS MATRIX DOCK
+  const totalsDataRecapMatrix = useMemo(() => {
+    // If the data object is null or still loading, instantly pass safe default values
+    if (!order) {
+      return { subtotal: 0, discount: 0, shipping: 0, grandTotal: 0 };
+    }
+
+    const baseSubtotal = Array.isArray(order.items)
+      ? order.items.reduce((sum: number, it: any) => sum + (parseFloat(it.price || it.unitPrice || '0') * (Number(it.quantity) || 1)), 0)
+      : parseFloat(order.subtotal || order.subtotalAmount || '0');
+
+    const markdownDiscount = parseFloat(order.discount || order.discountAmount || '0') + parseFloat(order.newUserDiscountApplied || '0');
+    const parsedShippingFreight = parseFloat(order.shippingFee || '0');
+    const totalInvoiceCollectBalance = parseFloat(order.totalAmount || '0');
+
+    return {
+      subtotal: Math.round(baseSubtotal || 0),
+      discount: Math.round(markdownDiscount || 0),
+      shipping: Math.round(parsedShippingFreight || 0),
+      grandTotal: Math.round(totalInvoiceCollectBalance || 0)
+    };
+  }, [order]);
+
+  // Early loading fallback guards (Remains exactly identical below your fixed hook)
+  if (loading && !order) return <View style={styles.center}><ActivityIndicator size="small" color="#000000" /></View>;
+  if (!order) return <View style={styles.center}><Text style={styles.emptyText}>{t('orderNotFound') || "ORDER NOT FOUND"}</Text></View>;
+  
+  const visibleItems = itemsExpanded ? order.items : order.items?.slice(0, 3) || [];
+
   // Early loading fallback guards
   if (loading) return <View style={styles.center}><ActivityIndicator size="small" color="#000000" /></View>;
   if (!order) return <View style={styles.center}><Text style={styles.emptyText}>{t('orderNotFound') || "ORDER NOT FOUND"}</Text></View>;
-  const visibleItems = itemsExpanded ? order.items : order.items?.slice(0, 3) || [];
-
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      
-      {/* 1. TOP HEADER STATUS STEPPER ROW */}
-      <View style={styles.whiteSection}>
-        <View style={[styles.titleNavRow, isRTL && { flexDirection: 'row-reverse' }]}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.inlineBackBtn} activeOpacity={0.7}>
-            <Ionicons name={isRTL ? "arrow-forward" : "arrow-back"} size={20} color="#000" />
-          </TouchableOpacity>
-          <Text style={styles.orderIdHeader}>{(t('orderDetails') || 'ORDER DETAILS').toUpperCase()}</Text>
-          <View style={{ width: 24 }} />
-        </View>
-        <Text style={[styles.orderIdSub, isRTL && { textAlign: 'right' }]}>
-          {(t('orderId') || 'ORDER ID')}: {id?.toString().toUpperCase()}
-        </Text>
-        
-        {/* Visual Stepper Node Bar Matrix */}
-        <View style={[styles.statusStepper, isRTL && { flexDirection: 'row-reverse' }]}>
-          <View style={styles.stepContainer}>
-            <View style={[styles.stepCircle, { backgroundColor: '#000000' }]} />
-            <Text style={styles.stepText}>{t('placed') || 'PLACED'}</Text>
-          </View>
-          <View style={[styles.stepLine, order.status !== 'pending' && { backgroundColor: '#000000' }]} />
+    <View style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+      {!mapFullscreen ? (
+        // 🎯 IDENTICAL TO CHECKOUT PAGE: Flat container wrapping isolated blocks
+        <View style={styles.container}>
           
-          <View style={styles.stepContainer}>
-            <View style={[styles.stepCircle, (order.status === 'picked_up' || order.status === 'delivered' || order.status === 'confirmed') && { backgroundColor: '#000000' }]} />
-            <Text style={styles.stepText}>{t('shipped') || 'SHIPPED'}</Text>
-          </View>
-          <View style={[styles.stepLine, order.status === 'delivered' && { backgroundColor: '#000000' }]} />
-          
-          <View style={styles.stepContainer}>
-            <View style={[styles.stepCircle, order.status === 'delivered' && { backgroundColor: '#000000' }]} />
-            <Text style={styles.stepText}>{t('delivered') || 'DELIVERED'}</Text>
-          </View>
-        </View>
-      </View>
-
-      {/* 2. DYNAMIC LOGISTICS MAP WITH ACTIVE ZOOM CONTROLS */}
-      <View style={styles.mapWrapper}>
-        <Text style={[styles.mapLabelText, isRTL && { textAlign: 'right' }]}>
-          {order.status === 'picked_up' ? (t('liveTracking') || 'LIVE TRACKING').toUpperCase() : (t('fleetMap') || 'FLEET MAP').toUpperCase()}
-        </Text>
-        <View style={styles.mapAbsoluteContainer}>
-          <UnifiedMap 
-            role="ADMIN" 
-            destinationCoords={customerCoords}
-            warehouseCoords={warehouseCoords}
-            driverCoords={liveDriverCoords}
-            orderStatus={order.status || "confirmed"}
-            orderId={id as string}
-          />
-          
-          {/* 🎯 FLOATING ZOOM CONTROLS INTERFACE */}
-          <View style={[styles.zoomFloatingControls, isRTL ? { left: 12 } : { right: 12 }]}>
+          {/* 1. STANDALONE FIXED MAP CONTAINER BOX (COMPLETELY SEPARATED FROM SCROLLVIEW) */}
+          <View style={styles.mapContainer}>
+            {MemoizedMapComponent}
             <TouchableOpacity 
-              style={styles.zoomPillBtn} 
-              activeOpacity={0.8}
-              onPress={() => webViewRef.current?.injectJavaScript('map.zoomIn();')}
+              onPress={() => router.back()} 
+              style={[styles.backFloatBtn, isRTL ? { right: 20, left: undefined } : { left: 20, right: undefined }]}
+              activeOpacity={0.7}
             >
-              <Ionicons name="add-outline" size={18} color="#000000" />
-            </TouchableOpacity>
-            <View style={styles.zoomDividerLine} />
-            <TouchableOpacity 
-              style={styles.zoomPillBtn} 
-              activeOpacity={0.8}
-              onPress={() => webViewRef.current?.injectJavaScript('map.zoomOut();')}
-            >
-              <Ionicons name="remove-outline" size={18} color="#000000" />
+              <Ionicons name={isRTL ? "chevron-forward" : "chevron-back"} size={22} color="#000000" />
             </TouchableOpacity>
           </View>
-        </View>
-      </View>
 
-      {/* 3. ITEMS LIST SECTION WITH EXPANDABLE ACCENTS */}
-      <View style={styles.whiteSection}>
-        <Text style={[styles.sectionTitle, isRTL && { textAlign: 'right' }]}>
-          {(t('items') || 'ITEMS').toUpperCase()} ({order.items?.length || 0})
-        </Text>
-        
-        {visibleItems?.map((item: any, idx: number) => (
-          <View key={`item-row-${item.id || idx}`} style={[styles.itemRow, isRTL && { flexDirection: 'row-reverse' }]}>
-            <Image source={{ uri: item.productImage || item.imageUrl }} style={styles.thumb} />
-            <View style={[styles.itemDetails, { marginLeft: isRTL ? 0 : 12, marginRight: isRTL ? 12 : 0 }]}>
-              <Text style={[styles.itemName, isRTL && { textAlign: 'right' }]} numberOfLines={1}>
-                {(item.productName || item.name || '').toUpperCase()}
-              </Text>
-              <Text style={[styles.itemMeta, isRTL && { textAlign: 'right' }]}>
-                {item.selectedSize ? `Size: ${item.selectedSize}` : 'One Size'}  |  Qty: {item.quantity || 1}
-              </Text>
-              {/* 🎯 THE ACCURATE VAL FIX: Evaluates raw unit multiplied parameters safely to reject static fallback errors */}
-              <Text style={[styles.price, isRTL && { textAlign: 'right' }]}>
-                AFN {(Number(item.price || 0) * Number(item.quantity || 1)).toLocaleString()}
-              </Text>
-            </View>
-          </View>
-        ))}
-
-        {/* 🎯 COLLAPSIBLE ACCORDION EXPAND TOGGLE BTN ANCHOR */}
-        {order.items?.length > 3 && (
-          <TouchableOpacity 
-            style={[styles.expandToggleBtn, isRTL && { flexDirection: 'row-reverse' }]} 
-            activeOpacity={0.7}
-            onPress={() => setItemsExpanded(!itemsExpanded)}
+          {/* 2. ISOLATED SCROLLING SHEET PANEL (NO SHARED SCROLL OVERLAPS CONTROLS) */}
+          <ScrollView 
+            style={styles.scrollForm} 
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollContent} 
           >
-            <Text style={styles.expandToggleText}>
-              {itemsExpanded ? 'SHOW LESS ITEMS' : `SHOW ALL ITEMS (${order.items.length})`}
-            </Text>
-            <Ionicons name={itemsExpanded ? "chevron-up" : "chevron-down"} size={14} color="#666" />
-          </TouchableOpacity>
-        )}
-      </View>
+            {/* STEP PROCESS STEPPER CHECKPOINT STATUS LIST */}
+            <View style={styles.section}>
+              <View style={[styles.statusStepper, isRTL && { flexDirection: 'row-reverse' }]}>
+                <View style={styles.stepContainer}>
+                  <View style={[styles.stepCircle, { backgroundColor: '#000000' }]} />
+                  <Text style={styles.stepText}>PLACED</Text>
+                </View>
+                <View style={[styles.stepLine, order.status !== 'pending' && { backgroundColor: '#000000' }]} />
+                <View style={styles.stepContainer}>
+                  <View style={[styles.stepCircle, (order.status === 'picked_up' || order.status === 'delivered' || order.status === 'confirmed') ? { backgroundColor: '#000000' } : { backgroundColor: '#EAEAEA' }]} />
+                  <Text style={styles.stepText}>SHIPPED</Text>
+                </View>
+                <View style={[styles.stepLine, order.status === 'delivered' && { backgroundColor: '#000000' }]} />
+                <View style={styles.stepContainer}>
+                  <View style={[styles.stepCircle, order.status === 'delivered' ? { backgroundColor: '#000000' } : { backgroundColor: '#EAEAEA' }]} />
+                  <Text style={styles.stepText}>DELIVERED</Text>
+                </View>
+              </View>
+            </View>
 
-      {/* 4. BILLING SUMMARY STATEMENTS & ADDRESS */}
-      <View style={styles.whiteSection}>
-        <Text style={[styles.sectionTitle, isRTL && { textAlign: 'right' }]}>
-          {(t('orderSummary') || 'ORDER SUMMARY').toUpperCase()}
-        </Text>
-        
-        <View style={[styles.summaryRow, isRTL && { flexDirection: 'row-reverse' }]}>
-          <Text style={styles.summaryLabel}>{t('subtotal') || 'Subtotal'}</Text>
-          <Text style={styles.summaryValue}>
-            AFN {(Math.max(0, (Number(order.totalAmount) || 0) - (Number(order.shippingFee) || 0))).toLocaleString()}
-          </Text>
+            {/* CARGO INVENTORY ITEMS TRAY SLATS */}
+            <View style={styles.section}>
+              <Text style={[styles.sectionLabel, isRTL && { textAlign: 'right' }]}>
+                {(t('items') || 'ITEMS').toUpperCase()} ({order.items?.length || 0})
+              </Text>
+              {visibleItems?.map((item: any, idx: number) => {
+                const itemPrice = parseFloat(item.price || item.unitPrice || '0');
+                const itemQty = Number(item.quantity) || 1;
+                return (
+                  <View key={`item-${item.id || idx}`} style={[styles.itemRow, isRTL && { flexDirection: 'row-reverse' }]}>
+                    <Image source={{ uri: item.productImage || item.imageUrl }} style={styles.thumb} />
+                    <View style={[{ flex: 1 }, isRTL ? { marginRight: 15, alignItems: 'flex-end' } : { marginLeft: 15, alignItems: 'flex-start' }]}>
+                      <Text style={styles.itemName} numberOfLines={1}>{(item.productName || item.name || '').toUpperCase()}</Text>
+                      <Text style={styles.itemMeta}>Qty: {itemQty}  |  Size: {item.selectedSize || 'Standard'}</Text>
+                      <Text style={styles.priceText}>AFN {Math.round(itemPrice * itemQty).toLocaleString()}</Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+
+            {/* MONOCHROME DETAILED ACCOUNTING BILLING Recaps REVIEWS SHEET */}
+            <View style={styles.section}>
+              <Text style={[styles.sectionLabel, isRTL && { textAlign: 'right' }]}>
+                {(t('financialRecap') || 'ORDER FINANCIAL RECAP').toUpperCase()}
+              </Text>
+              
+              <View style={[styles.billingRow, isRTL && { flexDirection: 'row-reverse' }]}>
+                <Text style={styles.billLabel}>Bag Subtotal</Text>
+                <Text style={styles.billValue}>AFN {totalsDataRecapMatrix.subtotal.toLocaleString()}</Text>
+              </View>
+
+              {totalsDataRecapMatrix.discount > 0 && (
+                <View style={[styles.billingRow, isRTL && { flexDirection: 'row-reverse' }]}>
+                  <Text style={[styles.billLabel, { color: '#FF3B30' }]}>Promo Discount</Text>
+                  <Text style={[styles.billValue, { color: '#FF3B30' }]}>- AFN {totalsDataRecapMatrix.discount.toLocaleString()}</Text>
+                </View>
+              )}
+
+              <View style={[styles.billingRow, isRTL && { flexDirection: 'row-reverse' }]}>
+                <Text style={styles.billLabel}>Logistics Shipping Freight</Text>
+                <Text style={[styles.billValue, totalsDataRecapMatrix.shipping === 0 && { color: '#22C55E', fontWeight: '900' }]}>
+                  {totalsDataRecapMatrix.shipping === 0 ? "FREE" : `AFN ${totalsDataRecapMatrix.shipping.toLocaleString()}`}
+                </Text>
+              </View>
+
+              <View style={styles.dividerLine} />
+
+              <View style={[styles.billingRow, { marginTop: 12 }, isRTL && { flexDirection: 'row-reverse' }]}>
+                <Text style={[styles.billLabel, { color: '#000000', fontWeight: '900' }]}>Total Payable Cash Collect</Text>
+                <Text style={[styles.billValue, { fontSize: 16, color: '#000000', fontWeight: '900' }]}>AFN {totalsDataRecapMatrix.grandTotal.toLocaleString()}</Text>
+              </View>
+            </View>
+          </ScrollView>
         </View>
-        
-        <View style={[styles.summaryRow, isRTL && { flexDirection: 'row-reverse' }]}>
-          <Text style={styles.summaryLabel}>{t('shipping') || 'Shipping Fee'}</Text>
-          <Text style={[styles.summaryValue, Number(order.shippingFee) === 0 && { color: '#22C55E', fontWeight: '900' }]}>
-            {Number(order.shippingFee) === 0 ? 'FREE' : `AFN ${Number(order.shippingFee).toLocaleString()}`}
-          </Text>
+      ) : (
+        /* FULLSCREEN BREAKOUT OVERLAY INTERACTION MATRIX LAYER */
+        <View style={styles.fullscreenOverlay}>
+          {MemoizedMapComponent}
         </View>
-
-        <View style={styles.dividerLine} />
-
-        <View style={[styles.summaryRow, { marginBottom: 0 }, isRTL && { flexDirection: 'row-reverse' }]}>
-          <Text style={styles.totalLabel}>{t('total') || 'Total Amount'}</Text>
-          <Text style={styles.totalValue}>
-            AFN {Number(order.totalAmount || 0).toLocaleString()}
-          </Text>
-        </View>
-      </View>
-
-      {/* 5. DELIVERY DESTINATION INFO BLOCK */}
-      <View style={[styles.whiteSection, { marginBottom: 40 }]}>
-        <Text style={[styles.sectionTitle, isRTL && { textAlign: 'right' }]}>
-          {(t('deliveryAddress') || 'DELIVERY DESTINATION').toUpperCase()}
-        </Text>
-        <View style={[styles.addressBlockRow, isRTL && { flexDirection: 'row-reverse' }]}>
-          <Ionicons name="location-outline" size={16} color="#000" style={isRTL ? { marginLeft: 8 } : { marginRight: 8 }} />
-          <Text style={[styles.addressText, isRTL && { textAlign: 'right' }]}>
-            {order.address?.toUpperCase() || 'No address specified.'}
-          </Text>
-        </View>
-      </View>
-
-    </ScrollView>
+      )}
+    </View>
   );
 }
 
-
 export const styles = StyleSheet.create({
-  // Global View Backdrops
-  container: { 
-    flex: 1, 
-    backgroundColor: '#FAFAFA' 
+  container: {
+    flex: 1,
+    backgroundColor: '#FFFFFF'
   },
+  mapContainer: {
+    height: 280,
+    width: '100%',
+    backgroundColor: '#F9F9F9',
+    borderBottomWidth: 1,
+    borderBottomColor: '#EEEEEE',
+    position: 'relative'
+  },
+  backFloatBtn: {
+    position: 'absolute',
+    top: 50,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
+    zIndex: 100
+  },
+    // 🎯 THE BALANCING DESIGNS FIX: Appended center and emptyText definitions cleanly!
   center: { 
     flex: 1, 
     justifyContent: 'center', 
     alignItems: 'center', 
-    backgroundColor: '#FFFFFF', 
-    minHeight: 300 
-  },
-  
-  // Section Layout Boxes
-  whiteSection: { 
-    backgroundColor: '#FFFFFF', 
-    padding: 16, 
-    marginBottom: 10, 
-    borderWidth: 1, 
-    borderColor: '#F5F5F5' 
-  },
-  titleNavRow: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    marginTop: Platform.OS === 'ios' ? 55 : 44, 
-    marginBottom: 12 
-  },
-  inlineBackBtn: { 
-    padding: 2 
-  },
-  orderIdHeader: { 
-    fontSize: 13, 
-    fontWeight: '800', 
-    letterSpacing: 2, 
-    color: '#000000' 
-  },
-  orderIdSub: { 
-    fontSize: 11, 
-    color: '#888888', 
-    fontWeight: '500', 
-    letterSpacing: 0.5, 
-    marginBottom: 18 
-  },
-
-  // Logistics Stepper Line Elements
-  statusStepper: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    justifyContent: 'space-between', 
-    paddingHorizontal: 4, 
-    marginVertical: 6 
-  },
-  stepContainer: { 
-    alignItems: 'center', 
-    width: 60 
-  },
-  stepCircle: { 
-    width: 10, 
-    height: 10, 
-    borderRadius: 5, 
-    backgroundColor: '#E0E0E0', 
-    marginBottom: 6 
-  },
-  stepText: { 
-    fontSize: 9, 
-    fontWeight: '700', 
-    color: '#222222', 
-    letterSpacing: 0.5, 
-    textTransform: 'uppercase' 
-  },
-  stepLine: { 
-    flex: 1, 
-    height: 2, 
-    backgroundColor: '#EAEAEA', 
-    marginTop: -14 
-  },
-
-  // Unified Map Framing Wrappers
-  mapWrapper: { 
-    padding: 16, 
-    backgroundColor: '#FFFFFF', 
-    marginBottom: 10, 
-    borderWidth: 1, 
-    borderColor: '#F5F5F5' 
-  },
-  mapLabelText: { 
-    fontSize: 11, 
-    fontWeight: '800', 
-    letterSpacing: 1.5, 
-    color: '#000000', 
-    marginBottom: 12 
-  },
-  mapAbsoluteContainer: { 
-    width: '100%', 
-    height: 220, 
-    position: 'relative', 
-    borderRadius: 2, 
-    overflow: 'hidden' 
-  },
-
-  // Floating Leaflet Zoom Controller Anchors
-  zoomFloatingControls: { 
-    position: 'absolute', 
-    bottom: 16, 
-    backgroundColor: '#FFFFFF', 
-    borderWidth: 1, 
-    borderColor: '#EAEAEA', 
-    elevation: 4, 
-    shadowColor: '#000000', 
-    shadowOffset: { width: 0, height: 2 }, 
-    shadowOpacity: 0.1, 
-    shadowRadius: 3, 
-    borderRadius: 2,
-    zIndex: 999 
-  },
-  zoomPillBtn: { 
-    width: 34, 
-    height: 34, 
-    justifyContent: 'center', 
-    alignItems: 'center', 
     backgroundColor: '#FFFFFF' 
   },
-  zoomDividerLine: { 
-    height: 1, 
-    backgroundColor: '#EFEFEF', 
-    width: '100%' 
-  },
-
-  // E-Commerce Line Item Rows
-  sectionTitle: { 
-    fontSize: 11, 
-    fontWeight: '800', 
-    letterSpacing: 2, 
-    color: '#000000', 
-    marginBottom: 16 
-  },
-  itemRow: { 
-    flexDirection: 'row', 
-    paddingVertical: 12, 
-    borderBottomWidth: 1, 
-    borderBottomColor: '#FAFAFA' 
-  },
-  thumb: { 
-    width: 60, 
-    height: 80, 
-    backgroundColor: '#FAFAFA' 
-  },
-  itemDetails: { 
-    flex: 1, 
-    justifyContent: 'space-between' 
-  },
-  itemName: { 
+  emptyText: { 
     fontSize: 12, 
-    fontWeight: '800', 
-    color: '#111111', 
-    letterSpacing: 0.2 
-  },
-  itemMeta: { 
-    fontSize: 10, 
-    color: '#999999', 
-    fontWeight: '600' 
-  },
-  price: { 
-    fontSize: 13, 
-    fontWeight: '900', 
-    color: '#000000' 
+    fontWeight: '700', 
+    color: '#888888',
+    letterSpacing: 0.5
   },
 
-  // Expandable Accordion Selector Bars
-  expandToggleBtn: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    justifyContent: 'center', 
-    gap: 6, 
-    marginTop: 14, 
-    paddingVertical: 10, 
-    backgroundColor: '#FAFAFA', 
-    borderWidth: 0.5, 
+  scrollForm: {
+    flex: 1,
+    backgroundColor: '#FFFFFF'
+  },
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 40
+  },
+  section: {
+    marginBottom: 24,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F5F5F5'
+  },
+  sectionLabel: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#000000',
+    letterSpacing: 2,
+    marginBottom: 16
+  },
+  statusStepper: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 4
+  },
+  stepContainer: {
+    alignItems: 'center',
+    gap: 6
+  },
+  stepCircle: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#E0E0E0',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF'
+  },
+  stepText: {
+    fontSize: 8,
+    fontWeight: '900',
+    color: '#000000',
+    letterSpacing: 0.5
+  },
+  stepLine: {
+    flex: 1,
+    height: 2,
+    backgroundColor: '#EAEAEA',
+    marginHorizontal: 6,
+    marginTop: -14
+  },
+  itemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 0.5,
+    borderBottomColor: '#F9F9F9'
+  },
+  thumb: {
+    width: 44,
+    height: 58,
+    backgroundColor: '#FAFAFA',
+    borderWidth: 0.5,
     borderColor: '#EAEAEA',
-    borderRadius: 2
+    borderRadius: 0
   },
-  expandToggleText: { 
-    fontSize: 9, 
-    fontWeight: '800', 
-    color: '#666666', 
-    letterSpacing: 0.5 
+  itemName: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#000000',
+    textTransform: 'uppercase'
   },
-
-  // Revenue Summary Ledger Sheets
-  summaryRow: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    marginBottom: 12 
+  itemMeta: {
+    fontSize: 10,
+    color: '#888888',
+    fontWeight: '600',
+    marginTop: 2
   },
-  summaryLabel: { 
-    fontSize: 13, 
-    color: '#666666', 
-    fontWeight: '500' 
+  priceText: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#000000',
+    marginTop: 4
   },
-  summaryValue: { 
-    fontSize: 13, 
-    color: '#000000', 
-    fontWeight: '700' 
+  billingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 5
   },
-  dividerLine: { 
-    height: 1, 
-    backgroundColor: '#F5F5F5', 
-    marginVertical: 14 
+  billLabel: {
+    fontSize: 12,
+    color: '#666666',
+    fontWeight: '500'
   },
-  totalLabel: { 
-    fontSize: 12, 
-    fontWeight: '900', 
-    color: '#000000', 
-    letterSpacing: 1 
+  billValue: {
+    fontSize: 13,
+    color: '#000000',
+    fontWeight: '700'
   },
-  totalValue: { 
-    fontSize: 18, 
-    fontWeight: '900', 
-    color: '#000000', 
-    letterSpacing: -0.5 
+  dividerLine: {
+    height: 0.5,
+    backgroundColor: '#EFEFEF',
+    marginVertical: 10
   },
-
-  // Final Delivery Address Blocks
-  addressBlockRow: { 
-    flexDirection: 'row', 
-    alignItems: 'flex-start', 
-    marginTop: 2 
-  },
-  addressText: { 
-    fontSize: 12, 
-    color: '#444444', 
-    lineHeight: 18, 
-    fontWeight: '600', 
-    flex: 1 
+  fullscreenOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#FFFFFF',
+    zIndex: 999999,
+    elevation: 999999
   }
 });

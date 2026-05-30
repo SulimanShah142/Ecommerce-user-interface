@@ -207,160 +207,413 @@ export default function HomePage() {
 }
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: '#FFFFFF' 
-  },
-  topBar: { 
-    paddingTop: 54, 
-    paddingHorizontal: 16, 
-    paddingBottom: 14,
+  container: {
+    flex: 1,
     backgroundColor: '#FFFFFF',
+  },
+
+  // 🎯 PREMIUM FLOATING HEADER
+  topBar: {
+    paddingTop: 5,
+    paddingHorizontal: 18,
+    paddingBottom: 16,
+
+    backgroundColor: '#FFFFFF',
+
     borderBottomWidth: 1,
-    borderBottomColor: '#F5F5F5'
-  },
-  searchContainer: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    backgroundColor: '#FAFAFA', 
-    borderRadius: 4, 
-    paddingHorizontal: 12, 
-    height: 40,
-    borderWidth: 1,
-    borderColor: '#EAEAEA'
-  },
-  searchInput: { 
-    flex: 1, 
-    marginLeft: 10, 
-    fontSize: 11, 
-    fontWeight: '500',
-    letterSpacing: 1,
-    color: '#000000'
-  },
-  catScroll: { 
-    backgroundColor: '#FFFFFF'
-  },
-  catScrollContent: {
-    paddingLeft: 16,
-    paddingRight: 6,
-    paddingVertical: 18
-  },
-  catCircleItem: { 
-    alignItems: 'center', 
-    marginRight: 14,
-    width: 64
-  },
-  circle: { 
-    width: 60, 
-    height: 60, 
-    borderRadius: 30, 
-    backgroundColor: '#FAFAFA', 
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#EEEEEE' 
-  },
-  circleImg: { 
-    width: '100%', 
-    height: '100%',
-    resizeMode: 'cover' 
-  },
-  catLabel: { 
-    fontSize: 9, 
-    marginTop: 8, 
-    textAlign: 'center', 
-    fontWeight: '600',
-    textTransform: 'uppercase', 
-    color: '#111111',
-    letterSpacing: 0.5
-  },
-  sectionTitle: { 
-    fontSize: 13, 
-    fontWeight: '800', 
-    letterSpacing: 3, 
-    textAlign: 'center', 
-    marginTop: 28,
-    marginBottom: 20,
-    textTransform: 'uppercase',
-    color: '#000000'
-  },
-  productGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingHorizontal: 16,
-    justifyContent: 'space-between'
-  },
-  productCard: {
-    width: PRODUCT_CARD_WIDTH,
-    marginBottom: 24,
-    backgroundColor: '#FFFFFF'
-  },
-  imageContainer: {
-    width: '100%',
-    aspectRatio: 3 / 4, // 🎯 High-end 3:4 portrait fashion ratio
-    backgroundColor: '#FAFAFA',
-    position: 'relative',
-    overflow: 'hidden',
-    borderRadius: 2
-  },
-  productImage: { 
-    width: '100%', 
-    height: '100%',
-    resizeMode: 'cover'
-  },
-  badge: {
-    position: 'absolute',
-    top: 8,
-    backgroundColor: '#000000',
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 1
-  },
-  badgeText: {
-    color: '#FFFFFF',
-    fontSize: 8,
-    fontWeight: '800',
-    letterSpacing: 0.5
-  },
-  wishlistBtn: {
-    position: 'absolute',
-    top: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderBottomColor: '#EFEFEF',
+
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    elevation: 2,
   },
-  productInfo: { 
-    paddingTop: 10,
-    paddingHorizontal: 2
-  },
-  productName: { 
-    fontSize: 10, 
-    color: '#222222', 
-    fontWeight: '500',
-    letterSpacing: 0.8,
-    marginBottom: 4
-  },
-  priceRow: {
+
+  // 🎯 MODERN SEARCH BAR
+  searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6
+
+    height: 46,
+
+    backgroundColor: '#F7F7F7',
+
+    borderRadius: 14,
+
+    paddingHorizontal: 14,
+
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
   },
-  productPrice: { 
-    fontSize: 11, 
-    color: '#000000', 
-    fontWeight: '700' 
+
+  searchInput: {
+    flex: 1,
+
+    marginLeft: 10,
+
+    fontSize: 13,
+
+    fontWeight: '500',
+
+    color: '#111111',
+
+    letterSpacing: 0.2,
   },
-  oldPrice: { 
-    fontSize: 9, 
-    color: '#999999', 
+
+  // 🎯 CATEGORY STRIP
+  catScroll: {
+    backgroundColor: '#FFFFFF',
+  },
+
+  catScrollContent: {
+    paddingLeft: 18,
+    paddingRight: 8,
+    paddingTop: 18,
+    paddingBottom: 8,
+  },
+
+  catCircleItem: {
+    alignItems: 'center',
+
+    marginRight: 16,
+
+    width: 72,
+  },
+
+  // 🎯 PREMIUM CATEGORY BUBBLE
+  circle: {
+    width: 68,
+    height: 68,
+
+    borderRadius: 34,
+
+    backgroundColor: '#F8F8F8',
+
+    overflow: 'hidden',
+
+    borderWidth: 1,
+    borderColor: '#F2F2F2',
+
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+
+    elevation: 2,
+  },
+
+  circleImg: {
+    width: '100%',
+    height: '100%',
+
+    resizeMode: 'cover',
+  },
+
+  catLabel: {
+    marginTop: 10,
+
+    fontSize: 10,
+
+    textAlign: 'center',
+
+    fontWeight: '700',
+
+    color: '#111111',
+
+    letterSpacing: 0.4,
+  },
+
+  // 🎯 PREMIUM SECTION TITLE
+  sectionTitle: {
+    fontSize: 16,
+
+    fontWeight: '800',
+
+    color: '#111111',
+
+    letterSpacing: 1.2,
+
+    marginTop: 30,
+    marginBottom: 18,
+
+    paddingHorizontal: 18,
+  },
+
+  // 🎯 PRODUCT GRID
+  productGrid: {
+    flexDirection: 'row',
+
+    flexWrap: 'wrap',
+
+    justifyContent: 'space-between',
+
+    paddingHorizontal: 12,
+  },
+
+  // 🎯 PRODUCT CARD
+  productCard: {
+    width: PRODUCT_CARD_WIDTH,
+
+    marginBottom: 28,
+
+    backgroundColor: '#FFFFFF',
+
+    borderRadius: 14,
+
+    overflow: 'hidden',
+  },
+
+  // 🎯 IMAGE CONTAINER
+  imageContainer: {
+    width: '100%',
+
+    aspectRatio: 3 / 4,
+
+    backgroundColor: '#F5F5F5',
+
+    position: 'relative',
+
+    overflow: 'hidden',
+
+    borderRadius: 14,
+  },
+
+  productImage: {
+    width: '100%',
+    height: '100%',
+
+    resizeMode: 'cover',
+
+    transform: [{ scale: 1.01 }],
+  },
+
+  // 🎯 SALE BADGE
+  badge: {
+    position: 'absolute',
+
+    top: 10,
+    left: 10,
+
+    backgroundColor: '#000000',
+
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+
+    borderRadius: 6,
+  },
+
+  badgeText: {
+    color: '#FFFFFF',
+
+    fontSize: 9,
+
+    fontWeight: '800',
+
+    letterSpacing: 0.5,
+  },
+
+  // 🎯 WISHLIST BUTTON
+  wishlistBtn: {
+    position: 'absolute',
+
+    top: 10,
+    right: 10,
+
+    width: 34,
+    height: 34,
+
+    borderRadius: 17,
+
+    justifyContent: 'center',
+    alignItems: 'center',
+
+    backgroundColor: 'rgba(255,255,255,0.96)',
+
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+
+    elevation: 3,
+  },
+
+  // 🎯 PRODUCT INFO
+  productInfo: {
+    paddingTop: 12,
+    paddingHorizontal: 4,
+  },
+
+  // 🎯 PRODUCT NAME
+  productName: {
+    fontSize: 12,
+
+    color: '#222222',
+
+    fontWeight: '600',
+
+    lineHeight: 18,
+
+    marginBottom: 6,
+  },
+
+  // 🎯 META TEXT
+  metaText: {
+    marginBottom: 6,
+
+    fontSize: 10,
+
+    color: '#777777',
+
+    fontWeight: '500',
+  },
+
+  // 🎯 PRICE ROW
+  priceRow: {
+    flexDirection: 'row',
+
+    alignItems: 'center',
+
+    gap: 8,
+  },
+
+  // 🎯 CURRENT PRICE
+  productPrice: {
+    fontSize: 14,
+
+    color: '#000000',
+
+    fontWeight: '800',
+  },
+
+  // 🎯 OLD PRICE
+  oldPrice: {
+    fontSize: 11,
+
+    color: '#999999',
+
     textDecorationLine: 'line-through',
-    fontWeight: '400'
-  }
+  },
+
+  // 🎯 LOADING STATE
+  mapLoaderContainer: {
+    height: 220,
+
+    justifyContent: 'center',
+    alignItems: 'center',
+
+    backgroundColor: '#FAFAFA',
+
+    borderRadius: 18,
+
+    marginHorizontal: 18,
+  },
+
+  // 🎯 EMPTY STATE
+  emptyContainer: {
+    flex: 1,
+
+    justifyContent: 'center',
+    alignItems: 'center',
+
+    paddingHorizontal: 40,
+  },
+
+  emptyTitle: {
+    fontSize: 18,
+
+    fontWeight: '800',
+
+    color: '#111111',
+
+    marginTop: 16,
+  },
+
+  emptyText: {
+    marginTop: 8,
+
+    fontSize: 13,
+
+    textAlign: 'center',
+
+    lineHeight: 20,
+
+    color: '#777777',
+  },
+
+  // 🎯 FLOATING FILTER BUTTON
+  floatingFilterBtn: {
+    position: 'absolute',
+
+    bottom: 28,
+    right: 22,
+
+    height: 52,
+
+    paddingHorizontal: 22,
+
+    borderRadius: 26,
+
+    backgroundColor: '#000000',
+
+    flexDirection: 'row',
+
+    alignItems: 'center',
+    justifyContent: 'center',
+
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+
+    elevation: 6,
+  },
+
+  floatingFilterText: {
+    color: '#FFFFFF',
+
+    fontSize: 12,
+
+    fontWeight: '700',
+
+    marginLeft: 8,
+
+    letterSpacing: 0.4,
+  },
+
+  // 🎯 PREMIUM DIVIDER
+  divider: {
+    height: 1,
+
+    backgroundColor: '#F3F3F3',
+
+    marginVertical: 10,
+  },
+
+  // 🎯 SHIMMER / SKELETON PLACEHOLDER
+  skeletonCard: {
+    width: PRODUCT_CARD_WIDTH,
+
+    marginBottom: 28,
+  },
+
+  skeletonImage: {
+    width: '100%',
+
+    aspectRatio: 3 / 4,
+
+    borderRadius: 14,
+
+    backgroundColor: '#F2F2F2',
+  },
+
+  skeletonText: {
+    height: 12,
+
+    borderRadius: 6,
+
+    backgroundColor: '#F2F2F2',
+
+    marginTop: 10,
+  },
 });

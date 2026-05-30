@@ -7,8 +7,9 @@ import { useCart } from '../Contexts/CartContext';
 import UnifiedMap from '@/components/UnifiedMap';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
+import LocationPermissionModal from '@/components/LoxationPermissionModal';
 
-const API_URL = "https://workers.dev";
+const API_URL = "http://192.168.1.3:8787";
 
 export default function CheckoutScreen() {
   const router = useRouter();
@@ -26,12 +27,24 @@ export default function CheckoutScreen() {
   const [promoInput, setPromoInput] = useState('');
   const [appliedPromo, setAppliedPromo] = useState<any>(null);
   const [promoLoading, setPromoLoading] = useState(false);
+const [showLocationPermissionModal, setShowLocationPermissionModal] =
+  useState(false);
+
+const [locationBootLoading, setLocationBootLoading] =
+  useState(false);
 
   // 🎯 GOOGLE PLAY / APPLE APP STORE COMPLIANCE STATES
-  const [showCustomPermissionModal, setShowCustomPermissionModal] = useState(false);
-  const [locationLoading, setLocationLoading] = useState(false);
-  const hasAutoFetchedGps = useRef(false);
+const [showCustomPermissionModal, setShowCustomPermissionModal] =
+  useState(false);
 
+const [locationLoading, setLocationLoading] =
+  useState(false);
+
+const [gpsServicesDisabled, setGpsServicesDisabled] =
+  useState(false);
+
+const permissionFlowStarted =
+  useRef(false);
   // 1. Initial configurations loading pool
   useEffect(() => {
     let active = true;
@@ -43,60 +56,96 @@ export default function CheckoutScreen() {
   }, []);
 
   // 🎯 2. AUTOMATED SEEDING GPS PERMISSION LOGIC (NO MANUAL BUTTONS)
-  const captureUserLocationAutomatically = useCallback(async () => {
+ // 🎯 PRODUCTION GPS INITIALIZATION ENGINE
+useEffect(() => {
+
+  const initializeCheckoutGpsFlow = async () => {
+
     try {
-      const providerCheck = await Location.getProviderStatusAsync();
-      if (!providerCheck.locationServicesEnabled) return;
 
-      let userCoords = await Location.getLastKnownPositionAsync({});
-      if (!userCoords) {
-        userCoords = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      console.log(
+        "🛰️ Checkout GPS bootstrap initialized"
+      );
+
+      if (permissionFlowStarted.current) {
+        return;
       }
 
-      if (userCoords?.coords) {
-        setCoords([userCoords.coords.latitude, userCoords.coords.longitude]);
-        console.log(`🎯 Auto Coordinates Anchored: ${userCoords.coords.latitude}, ${userCoords.coords.longitude}`);
-      }
-    } catch (hardwareErr) {
-      console.log("GPS sensor timing loop skipped. Using defaults.", hardwareErr);
-    }
-  }, []);
+      permissionFlowStarted.current = true;
 
-  const executeNativeLocationSequence = async () => {
-    setShowCustomPermissionModal(false);
-    try {
-      setLocationLoading(true);
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status === 'granted') {
-        await captureUserLocationAutomatically();
-      } else {
-        Alert.alert(t('error') || "Permission Denied", "Please select location manually on the map.");
+      // 🎯 STEP 1: CHECK EXISTING PERMISSION
+      const existingPermission =
+        await Location.getForegroundPermissionsAsync();
+
+      console.log(
+        "📍 Existing Checkout Permission:",
+        existingPermission
+      );
+
+      // 🎯 STEP 2: SHOW BRANDED MODAL IF NOT GRANTED
+      if (!existingPermission.granted) {
+
+        setShowCustomPermissionModal(true);
+
+        return;
       }
-    } catch (err) {
-      console.error("GPS Bootstrap Error:", err);
-    } finally {
-      setLocationLoading(false);
+
+      // 🎯 STEP 3: CHECK GPS HARDWARE
+      const providerStatus =
+        await Location.getProviderStatusAsync();
+
+      console.log(
+        "🛰️ Checkout Provider Status:",
+        providerStatus
+      );
+
+      // 🎯 STEP 4: IF GPS OFF -> SHOW MODAL
+      if (!providerStatus.locationServicesEnabled) {
+
+        setGpsServicesDisabled(true);
+
+        setShowCustomPermissionModal(true);
+
+        return;
+      }
+
+      // 🎯 STEP 5: FETCH LIVE LOCATION
+      const currentPosition =
+        await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+
+      if (currentPosition?.coords) {
+
+        const liveCoords: [number, number] = [
+          currentPosition.coords.latitude,
+          currentPosition.coords.longitude,
+        ];
+
+        setCoords(liveCoords);
+
+        console.log(
+          "✅ Checkout GPS Coordinates:",
+          liveCoords
+        );
+      }
+
+    } catch (gpsErr) {
+
+      console.log(
+        "❌ Checkout GPS bootstrap failed",
+        gpsErr
+      );
     }
   };
 
-  useEffect(() => {
-    if (!hasAutoFetchedGps.current) {
-      hasAutoFetchedGps.current = true;
-      
-      const evaluatePermissionStatus = async () => {
-        const foregroundStatus = await Location.getForegroundPermissionsAsync();
-        if (foregroundStatus.granted) {
-          await captureUserLocationAutomatically();
-        } else {
-          // Present App Store compliant explanation dialog card first
-          setShowCustomPermissionModal(true);
-        }
-      };
-      evaluatePermissionStatus();
-    }
-  }, [captureUserLocationAutomatically]);
+  initializeCheckoutGpsFlow();
+
+}, []);
 
   // 3. ENHANCED SYSTEM-WIDE MULTI-TIER BILLING MATRICES ENGINE
+  // 3. ENHANCED SYSTEM-WIDE MULTI-TIER BILLING MATRICES ENGINE WITH NEW USER REWARD LOGIC
+    // 3. ENHANCED SYSTEM-WIDE MULTI-TIER BILLING MATRICES ENGINE (SHEIN EFFICIENCY UPGRADE)
   const totals = useMemo(() => {
     const baseDeliveryFee = parseFloat(settings?.deliveryFee || '150');
     const freeDeliveryLimit = parseFloat(settings?.freeDeliveryThreshold || '2000');
@@ -108,12 +157,63 @@ export default function CheckoutScreen() {
     const rewardValueAmount = parseFloat(settings?.rewardValue || '500');
     const rewardType = settings?.rewardType || 'discount';
 
+    // Calculate baseline contents amount values
     const calculatedSubtotalAfn = cartItems.reduce((sum: number, item: any) => {
       const unitPrice = parseFloat(item.price || '0');
       const itemQuantity = Number(item.quantity) || 1;
       return sum + (unitPrice * itemQuantity);
     }, 0);
 
+    // 🎯 1. NEW USER DISCOUNT TIMELINE & PURCHASE CAP LATCH
+    let newUserCampaignMarkdownAfn = 0;
+    
+    const isNewUserPromoActive = settings?.newUserDiscountActive === true || settings?.newUserDiscountActive === 'true';
+    const pastOrderCount = Number(session?.user?.orderCount || 0);
+    const maxAllowedPurchases = Number(settings?.newUserMaxPurchaseCount || 1);
+    
+    // Check campaign expiration date rules safely
+    let isCampaignDateValid = true;
+    if (settings?.newUserDiscountExpiresAt) {
+      isCampaignDateValid = new Date() < new Date(settings.newUserDiscountExpiresAt);
+    }
+
+    if (isNewUserPromoActive && pastOrderCount < maxAllowedPurchases && isCampaignDateValid) {
+      const discountType = settings?.newUserDiscountType || 'fixed';
+      const rawDiscountValue = parseFloat(settings?.newUserDiscountValue || '0');
+
+      if (discountType === 'percentage') {
+        newUserCampaignMarkdownAfn = calculatedSubtotalAfn * (rawDiscountValue / 100);
+      } else {
+        newUserCampaignMarkdownAfn = rawDiscountValue;
+      }
+      console.log(`✨ [CHECKOUT BONUS] New User Promo active: AFN ${newUserCampaignMarkdownAfn}`);
+    }
+
+    // 🎯 2. SMARTER MILESTONE REWARD LATCH (EFFICIENT SHEIN REPLICATION)
+    let rewardDiscountAfn = 0;
+    let earnedGiftText = null;
+
+    // Check past structural fields to see if this specific reward milestone has ALREADY been claimed and logged
+    const hasAlreadyClaimedMilestoneReward = session?.user?.hasClaimedMilestoneReward === true || session?.user?.hasClaimedMilestoneReward === 'true';
+    
+    // Sum total lifetime spend across past completed transactions safely
+    const pastLifetimeSpendAfn = parseFloat(session?.user?.totalLifetimeSpend || '0');
+
+    // Latch matches if: current basket hits limit OR total historic spend hits limit (and hasn't been claimed yet)
+    const qualifiesByCurrentBasket = calculatedSubtotalAfn >= rewardLimit;
+    const qualifiesByHistoricSpend = pastLifetimeSpendAfn >= rewardLimit;
+
+    if ((qualifiesByCurrentBasket || qualifiesByHistoricSpend) && !hasAlreadyClaimedMilestoneReward) {
+      if (rewardType === 'discount') {
+        rewardDiscountAfn = rewardValueAmount;
+        console.log(`🎉 [MILESTONE LATCH] Applied One-Time AFN ${rewardValueAmount} Spend Discount!`);
+      } else if (rewardType === 'gift') {
+        earnedGiftText = settings?.rewardValue || "FREE GIFT";
+        console.log(`🎁 [MILESTONE LATCH] Free Gift Unlocked: ${earnedGiftText}`);
+      }
+    }
+
+    // 3. STANDARD PROMO CODES VOUCHER HANDLING MATRIX
     let voucherMarkdownAfn = 0;
     if (appliedPromo) {
       voucherMarkdownAfn = appliedPromo.type === 'percentage' 
@@ -121,27 +221,21 @@ export default function CheckoutScreen() {
         : parseFloat(appliedPromo.value);
     }
 
-    let rewardDiscountAfn = 0;
-    let earnedGiftText = null;
-    const qualifiesForReward = calculatedSubtotalAfn >= rewardLimit;
-
-    if (qualifiesForReward) {
-      if (rewardType === 'discount') {
-        rewardDiscountAfn = rewardValueAmount;
-      } else if (rewardType === 'gift') {
-        earnedGiftText = settings?.rewardValue || "FREE GIFT";
-      }
-    }
-
+    // 4. LOGISTICS SHIPPING FREIGHT CALCULATION
     const isDeliveryFree = calculatedSubtotalAfn >= freeDeliveryLimit;
     const shippingCostAfn = isDeliveryFree ? 0 : baseDeliveryFee;
 
-    const finalAmountAfn = Math.max(0, calculatedSubtotalAfn - voucherMarkdownAfn - rewardDiscountAfn + shippingCostAfn);
+    // Deduct promotions and compile totals invoice balance metrics safely
+    const finalAmountAfn = Math.max(0, 
+      calculatedSubtotalAfn - newUserCampaignMarkdownAfn - voucherMarkdownAfn - rewardDiscountAfn + shippingCostAfn
+    );
+    
     const requiresPrepayment = finalAmountAfn > prepayLimit;
     const upfrontPaymentAfn = requiresPrepayment ? Math.round(finalAmountAfn * (prepayPercentage / 100)) : 0;
 
     return {
       subtotal: calculatedSubtotalAfn,
+      newUserDiscount: newUserCampaignMarkdownAfn,
       discount: voucherMarkdownAfn,
       rewardDiscount: rewardDiscountAfn,
       gift: earnedGiftText,
@@ -150,34 +244,57 @@ export default function CheckoutScreen() {
       final: finalAmountAfn,
       requiresPrepayment,
       prepayPercent: prepayPercentage,
-      prepayAmount: upfrontPaymentAfn
+      prepayAmount: upfrontPaymentAfn,
+      triggerMilestoneClaimFlag: (qualifiesByCurrentBasket || qualifiesByHistoricSpend) && !hasAlreadyClaimedMilestoneReward
     };
-  }, [cartItems, settings, appliedPromo]);
+  }, [cartItems, settings, appliedPromo, session?.user]);
 
+
+    // 🎯 PROMO CODE LEDGER MATRIX VERIFICATION GATES RESTORED
   const handleValidatePromo = async () => {
-    if (!promoInput.trim()) return;
+    if (!promoInput.trim()) {
+      return Alert.alert(t('error') || "Error", "Please enter a valid discount code string.");
+    }
+    
     setPromoLoading(true);
     try {
-      const res = await fetch(`${API_URL}/api/discounts/validate?code=${promoInput.toUpperCase().trim()}&amount=${totals.subtotal}`);
+      console.log(`📡 [PROMO VERIFICATION] Querying database ledger for voucher code: ${promoInput.toUpperCase().trim()}`);
+      
+      const res = await fetch(
+        `${API_URL}/api/discounts/validate?code=${promoInput.toUpperCase().trim()}&amount=${totals.subtotal}`
+      );
       const data = await res.json();
+      
       if (res.ok) {
         setAppliedPromo(data);
-        Alert.alert(t('success') || "Success", `Promo Code Applied!`);
+        Alert.alert(t('success') || "Success", `Promo Code Applied Successfully!`);
       } else {
-        Alert.alert(t('error') || "Error", data.error || "Invalid promo code");
+        Alert.alert(t('error') || "Error", data.error || "Invalid promo code or below minimum spend requirement.");
         setAppliedPromo(null);
       }
-    } catch (e) {
-      Alert.alert(t('error') || "Error", "Failed to validate promo code");
+    } catch (e: any) {
+      console.error("❌ Promo validation network drop exception:", e.message);
+      Alert.alert(t('error') || "Error", "Failed to validate promo code. Check your network link indicators.");
     } finally {
       setPromoLoading(false);
     }
   };
 
+
+  // 🎯 CORE TRANSACTIONAL ORDER PLACEMENT ACTION HANDLER
   const handlePlaceOrder = async () => {
-    if (!form.name || !form.phone || !form.address) return Alert.alert(t('requiredFields') || "Required Fields", t('fillAllDetails') || "Fill in info");
+    if (!form.name || !form.phone || !form.address) {
+      return Alert.alert(
+        t('requiredFields') || "Required Fields", 
+        t('fillAllDetails') || "Please fill in all information details before submitting."
+      );
+    }
+
+    console.log("🚀 Dispatched custom order transactional request payload to server...");
     setLoading(true);
+
     try {
+           // Inside app/checkout.tsx -> handlePlaceOrder function payload fetch block
       const response = await fetch(`${API_URL}/api/orders`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -189,7 +306,15 @@ export default function CheckoutScreen() {
           latitude: coords[0].toString(), 
           longitude: coords[1].toString(),
           totalAmount: totals.final.toString(),
-          shippingFee: totals.shipping.toString(),
+          shippingFee: totals.shipping.toString(), 
+          newUserDiscountApplied: totals.newUserDiscount.toString(),
+          
+          // 🎯 THE EFFICIENCY SYNC LOCK:
+          // Tells the backend to immediately lock down and set 'hasClaimedMilestoneReward' to true 
+          // inside the database user row if they earned the reward on this check pass!
+          consumesMilestoneRewardFlag: totals.triggerMilestoneClaimFlag,
+          milestoneRewardMarkdownApplied: totals.rewardDiscount.toString(),
+
           promoCode: appliedPromo ? promoInput.toUpperCase().trim() : null,
           items: cartItems.map(item => ({
             productId: item.id, 
@@ -201,19 +326,27 @@ export default function CheckoutScreen() {
         }),
       });
 
+
       if (response.ok) {
         clearCart(); 
-        Alert.alert(t('success') || "Success", t('orderPlacedSuccess') || "Order Placed!");
+        Alert.alert(
+          t('success') || "Success", 
+          t('orderPlacedSuccess') || "Your order has been recorded successfully!"
+        );
         router.replace('/orders');
       } else {
-        Alert.alert(t('error') || "Error", "Order placement failed.");
+        const errPayload = await response.json().catch(() => ({}));
+        Alert.alert(t('error') || "Error", errPayload?.error || "Order placement failed.");
       }
     } catch (e) {
-      Alert.alert(t('error') || "Error", "Network connection failed.");
+      console.error("❌ Checkout submit execution network drop out:", e);
+      Alert.alert(t('error') || "Error", "Network connection failed. Check your Wi-Fi.");
     } finally {
       setLoading(false);
     }
   };
+
+
 
   const MemoizedMap = useMemo(() => {
     if (!settings) {
@@ -243,10 +376,11 @@ export default function CheckoutScreen() {
 
 return (
   <View style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
-    <KeyboardAvoidingView 
-      style={{ flex: 1 }} 
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined} 
-    >
+     <KeyboardAvoidingView
+       style={{ flex: 1 }}
+       behavior={Platform.OS === "ios" ? "padding" : "height"}
+       keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0}
+     >
       <View style={styles.container}>
         
         {/* 1. MAP BOX AT ABSOLUTE TOP */}
@@ -277,7 +411,7 @@ return (
             </View>
 
             {/* INPUT FORM FIELDS */}
-            <TextInput 
+                       <TextInput 
               placeholder={t('fullName') || "FULL NAME"} 
               placeholderTextColor="#BBBBBB" 
               style={[styles.input, isRTL && { textAlign: 'right' }]} 
@@ -344,6 +478,23 @@ return (
                     </TouchableOpacity>
                   </View>
 
+                  {/* 🎯 NEW USER CELEBRATION BADGE CARD INSULATOR DOCK */}
+                  {totals.newUserDiscount > 0 && (
+                    <View style={styles.newUserIncentiveBadgeCard}>
+                      <View style={[styles.alertHeaderRow, isRTL && { flexDirection: 'row-reverse' }]}>
+                        <Ionicons name="sparkles-sharp" size={16} color="#000000" />
+                        <Text style={styles.newUserIncentiveTitleText}>
+                          {(t('welcomeBonusUnlocked') || 'WELCOME BONUS INSTANTLY UNLOCKED').toUpperCase()}
+                        </Text>
+                      </View>
+                      <Text style={[styles.newUserIncentiveBodyText, isRTL && { textAlign: 'right' }]}>
+                        {locale === 'en' 
+                          ? `As a verified new member, an automatic markdown of AFN ${toLocalNumbers(totals.newUserDiscount)} has been successfully subtracted from your final collect statement balance!`
+                          : `به عنوان یک کاربر جدید، تخفیف خوش‌آمدگویی به مبلغ افغانی ${toLocalNumbers(totals.newUserDiscount)} به صورت خودکار از صورتحساب شما کسر گردید!`}
+                      </Text>
+                    </View>
+                  )}
+
                   {/* 🎯 PREPAYMENT GATEWAY WARNING CARD */}
                   {totals.requiresPrepayment && (
                     <View style={styles.prepayAlertCard}>
@@ -384,6 +535,18 @@ return (
                       <Text style={styles.billValue}>AFN {toLocalNumbers(totals.subtotal)}</Text>
                     </View>
 
+                    {/* 🎯 NEW USER ACCUMULATED LEDGER MARKDOWN ROW BLOCK */}
+                    {totals.newUserDiscount > 0 && (
+                      <View style={[styles.billingRow, isRTL && { flexDirection: 'row-reverse' }]}>
+                        <Text style={[styles.billLabel, { color: '#000000', fontWeight: '700' }]}>
+                          {t('newUserMarkdown') || 'New Member Account Bonus'}
+                        </Text>
+                        <Text style={[styles.billValue, { color: '#000000', fontWeight: '800' }]}>
+                          - AFN {toLocalNumbers(totals.newUserDiscount)}
+                        </Text>
+                      </View>
+                    )}
+
                     {totals.discount > 0 && (
                       <View style={[styles.billingRow, isRTL && { flexDirection: 'row-reverse' }]}>
                         <Text style={[styles.billLabel, {color: '#FF3B30'}]}>{t('promoMarkdown') || 'Promo Code Markdown'}</Text>
@@ -406,6 +569,7 @@ return (
                     </View>
 
                     <View style={styles.dividerLine} />
+
 
                     <View style={[styles.totalRowSplit, isRTL && { flexDirection: 'row-reverse' }]}>
                       <Text style={styles.grandTotalLabel}>{(t('totalPayable') || 'TOTAL PAYABLE').toUpperCase()}</Text>
@@ -434,6 +598,98 @@ return (
                 </View>
               );
             })()}
+    <LocationPermissionModal
+  visible={showCustomPermissionModal}
+  loading={locationLoading}
+  title="Enable Precise Location"
+  description="Brand Gallery uses your live location to improve delivery accuracy, estimate arrival times, and automatically position your delivery pin."
+
+  onClose={() => {
+    setShowCustomPermissionModal(false);
+  }}
+
+  onAllow={async () => {
+
+    try {
+
+      setLocationLoading(true);
+
+      console.log(
+        "📍 Starting checkout GPS permission flow..."
+      );
+
+      // 🎯 CHECK EXISTING PERMISSION
+      let permission =
+        await Location.getForegroundPermissionsAsync();
+
+      // 🎯 REQUEST IF NOT GRANTED
+      if (!permission.granted) {
+
+        permission =
+          await Location.requestForegroundPermissionsAsync();
+
+        console.log(
+          "📍 Checkout Permission Response:",
+          permission
+        );
+
+        if (!permission.granted) {
+
+          Alert.alert(
+            "Permission Required",
+            "Location access improves delivery accuracy."
+          );
+
+          return;
+        }
+      }
+
+      // 🎯 FORCE NATIVE GPS ENABLE POPUP
+      const currentPosition =
+        await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+
+      // 🎯 SAVE LIVE COORDS
+      if (currentPosition?.coords) {
+
+        const liveCoords: [number, number] = [
+          currentPosition.coords.latitude,
+          currentPosition.coords.longitude,
+        ];
+
+        setCoords(liveCoords);
+
+        console.log(
+          "✅ Checkout Coordinates Updated:",
+          liveCoords
+        );
+      }
+
+      // 🎯 CLOSE MODAL
+      setGpsServicesDisabled(false);
+
+      setShowCustomPermissionModal(false);
+
+    } catch (err) {
+
+      console.log(
+        "❌ Checkout GPS permission flow failed",
+        err
+      );
+
+      Alert.alert(
+        "GPS Required",
+        "Please enable device location services."
+      );
+
+    } finally {
+
+      setLocationLoading(false);
+    }
+  }}
+/>
+
 
           </View>
         </ScrollView>
@@ -452,6 +708,67 @@ const styles = StyleSheet.create({
     flex: 1, 
     backgroundColor: '#FFFFFF' 
   },
+    // 🎯 HIGH-END MONOCHROME RETENTION DESIGN SPECIFICATIONS ADDITIONS
+  mapLoaderContainer: {
+    height: 280, // Matches your standalone fixed map height boundaries perfectly
+    width: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FAFAFA',
+    borderBottomWidth: 1,
+    borderBottomColor: '#EEEEEE',
+  },
+  sectionTitle: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#000000',
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+    marginBottom: 16,
+  },
+  
+  // RETAIN GLOBAL CARD WRAPPER CELL ALIGNMENTS
+  subSectionLabel: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#777777',
+    letterSpacing: 0.5,
+    marginBottom: 8,
+    textTransform: 'uppercase',
+  },
+  promoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    height: 44,
+    marginBottom: 14,
+    gap: 8,
+  },
+  promoInput: {
+    flex: 2,
+    height: '100%',
+    borderWidth: 1,
+    borderColor: '#EAEAEA',
+    backgroundColor: '#FAFAFA',
+    paddingHorizontal: 12,
+    fontSize: 13,
+    color: '#000000',
+  },
+  promoApplyBtn: {
+    flex: 1,
+    height: '100%',
+    backgroundColor: '#000000',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 0, // Sharp square SHEIN aesthetic boundaries
+  },
+  promoApplyText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
+
     billingSummarySheet: { backgroundColor: '#FFFFFF', padding: 18, borderVerticalWidth: 1, borderColor: '#F5F5F5', marginVertical: 10 },
   billingRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   billLabel: { fontSize: 13, color: '#666666', fontWeight: '500' },
@@ -466,6 +783,31 @@ const styles = StyleSheet.create({
   alertHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   prepayAlertTitle: { fontSize: 10, fontWeight: '900', color: '#D97706', letterSpacing: 1 },
   prepayAlertBody: { fontSize: 12, color: '#B45309', lineHeight: 18, fontWeight: '500' },
+  // 🎯 HIGH-END BRAND MONOCHROME CAMPAIGN BADGE SPECIFICATIONS
+  newUserIncentiveBadgeCard: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#000000', // Signature hard monochrome boundary line
+    borderRadius: 0,        // Sharp geometric corners
+    padding: 14,
+    marginTop: 14,
+    marginBottom: 4,
+  },
+  newUserIncentiveTitleText: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#000000',
+    letterSpacing: 1,
+    marginLeft: 6,
+  },
+  newUserIncentiveBodyText: {
+    fontSize: 11,
+    color: '#333333',
+    fontWeight: '400',
+    lineHeight: 16,
+    marginTop: 6,
+    letterSpacing: 0.1,
+  },
 
   // Gift validation badges configurations
   giftCelebrationBadge: { backgroundColor: '#F0FDF4', borderWidth: 1, borderColor: '#DCFCE7', padding: 14, flexDirection: 'row', alignItems: 'center', gap: 8, marginVertical: 8 },
@@ -510,13 +852,6 @@ const styles = StyleSheet.create({
   gpsBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   gpsBtnText: { fontSize: 9, fontWeight: '700', color: '#000000', letterSpacing: 1 },
   input: { height: 44, borderBottomWidth: 1, borderBottomColor: '#EAEAEA', paddingVertical: 10, marginBottom: 16, fontSize: 13, color: '#000000', letterSpacing: 0.4 },
-  subSectionLabel: { fontSize: 10, fontWeight: '800', color: '#111111', letterSpacing: 1.5, marginTop: 18, marginBottom: 10 },
-  promoRow: { flexDirection: 'row', gap: 10, alignItems: 'center', marginBottom: 24 },
-  promoInput: { flex: 1, backgroundColor: '#FAFAFA', borderWidth: 1, borderColor: '#EAEAEA', paddingHorizontal: 14, height: 40, fontSize: 12, color: '#000000', fontWeight: '600', letterSpacing: 1, borderRadius: 2 },
-  promoApplyBtn: { backgroundColor: '#000000', paddingHorizontal: 16, height: 40, justifyContent: 'center', alignItems: 'center', borderRadius: 2 },
-  promoApplyText: { color: '#FFFFFF', fontSize: 10, fontWeight: '800', letterSpacing: 1.2 },
-  billingCard: { borderTopWidth: 1, borderTopColor: '#F5F5F5', paddingTop: 16, marginTop: 6, gap: 12 },
-  
   billVal: { fontSize: 12, color: '#000000', fontWeight: '600', letterSpacing: 0.3 },
   
   // 🎯 THE PERFECTED STICKY FOOTER: Sits perfectly flush against the hardware safe space

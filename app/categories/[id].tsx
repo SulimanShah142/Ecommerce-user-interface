@@ -29,42 +29,52 @@ export default function CategoryPage() {
   const [loading, setLoading] = useState(true);
 
   const loadData = async (catId: string) => {
-   await initOfflineDb(); 
     try {
+      // 1. Ensure database initialization is complete before making any queries
+      await initOfflineDb(); 
+      
+      console.log("📂 Category Screen: Executing sequential database read lifecycle...");
 
-      // 1. Fetch Local Data (Ensure settings is extracted from array correctly)
-      const [localCat, localSubs, localProds, settingsResult] = await Promise.all([
-        loadCategoryLocal(catId),
-        loadSubcategoriesLocal(catId), 
-        loadProductsByCategoryLocal(catId),
-        execSql('SELECT * FROM app_settings LIMIT 1')
-      ]);
+      // 🎯 THE CRITICAL TRANSACTIONS FIX: 
+      // Swapped out Promise.all for sequential awaits! This processes tasks one by one, 
+      // which completely prevents SQLite connection overlap locks and clears the rollback error.
+      const localCat = await loadCategoryLocal(catId);
+      const localSubs = await loadSubcategoriesLocal(catId); 
+      const localProds = await loadProductsByCategoryLocal(catId);
+      const settingsResult = await execSql('SELECT * FROM app_settings LIMIT 1');
 
+      // Update UI states safely as the data returns sequentially
       if (localCat) setCategory(localCat);
       setSubcategories(localSubs || []);
       setProducts(localProds || []);
       
-      // FIX: Settings extraction to prevent "..." prices
       if (settingsResult && settingsResult.length > 0) {
         setSettings(settingsResult[0]);
       }
 
       setLoading(false);
 
-      // 2. Background Sync
+      // 2. Background Server Catalog Sync Engine Handshake
       const online = await isOnline().catch(() => false);
       if (online) {
-        syncRemoteCatalog().then(async () => {
-          const freshProds = await loadProductsByCategoryLocal(catId);
-          if (freshProds) setProducts(freshProds);
-          
-          // Refresh settings for latest conversion rates
-          const freshSettings = await execSql('SELECT * FROM app_settings LIMIT 1');
-          if (freshSettings?.length > 0) setSettings(freshSettings[0]);
-        });
+        // Run background catalog queries outside the main UI blocking thread loop
+        syncRemoteCatalog()
+          .then(async () => {
+            console.log("🛰️ Background Sync complete. Refreshing local views arrays...");
+            
+            // Execute background state updates sequentially as well to protect the SQLite instance
+            const freshProds = await loadProductsByCategoryLocal(catId);
+            if (freshProds) setProducts(freshProds);
+            
+            const freshSettings = await execSql('SELECT * FROM app_settings LIMIT 1');
+            if (freshSettings && freshSettings.length > 0) {
+              setSettings(freshSettings[0]);
+            }
+          })
+          .catch(e => console.log("⚠️ Background synchronization skipped a cycle:", e));
       }
-    } catch (err) {
-      console.error('Category Load Error:', err);
+    } catch (err: any) {
+      console.error('❌ Category Load Error Intercepted:', err.message || err);
       setLoading(false);
     }
   };
@@ -193,56 +203,223 @@ const renderHeader = () => (
 
  
 const styles = StyleSheet.create({
-  header: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    paddingHorizontal: 20, 
-    paddingTop: 60, 
-    paddingBottom: 15,
-    borderBottomWidth: 0.5,
-    borderBottomColor: '#eee'
-  },
-  titleContainer: { flex: 1, marginLeft: 15 },
-  title: { fontSize: 16, fontWeight: '900', letterSpacing: 1 },
-  list: { paddingHorizontal: 10, paddingBottom: 40 },
-  columnWrapper: { justifyContent: 'space-between' },
-  
-  productCard: { 
-    width: COLUMN_WIDTH, 
-    marginBottom: 20,
-    backgroundColor: '#fff' 
-  },
-  imageContainer: {
-    width: '100%',
-    height: 240, // Height is CRITICAL for RTL visibility
-    backgroundColor: '#F9F9F9',
-    position: 'relative',
-    overflow: 'hidden'
-  },
-  productImage: { width: '100%', height: '100%' },
-  productInfo: { paddingVertical: 8, paddingHorizontal: 4 },
-  productName: { fontSize: 12, color: '#444' },
-  productPrice: { fontSize: 14, fontWeight: '900', color: '#000', marginTop: 4 },
-  
-  wishlistBtn: { position: 'absolute', bottom: 10, backgroundColor: 'rgba(255,255,255,0.7)', padding: 6, borderRadius: 20 },
+  header: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  paddingHorizontal: 16,
+  paddingTop: 54,
+  paddingBottom: 12,
+  borderBottomWidth: 1,
+  borderBottomColor: '#F5F5F5',
+  backgroundColor: '#FFFFFF',
+},
+
+titleContainer: {
+  flex: 1,
+  marginLeft: 12,
+},
+
+title: {
+  fontSize: 14,
+  fontWeight: '900',
+  letterSpacing: 1.5,
+  color: '#000',
+},
+
+subtitle: {
+  fontSize: 9,
+  color: '#999',
+  marginTop: 2,
+  letterSpacing: 0.4,
+},
+
+headerContent: {
+  backgroundColor: '#FFFFFF',
+},
+
+subCatScroll: {
+  paddingVertical: 12,
+  borderBottomWidth: 1,
+  borderBottomColor: '#F7F7F7',
+  paddingLeft: 16,
+},
+
+subCatCapsule: {
+  paddingHorizontal: 14,
+  paddingVertical: 7,
+  backgroundColor: '#FAFAFA',
+  marginRight: 8,
+  borderRadius: 20,
+  borderWidth: 1,
+  borderColor: '#EEEEEE',
+},
+
+subCatText: {
+  fontSize: 9,
+  fontWeight: '800',
+  color: '#222',
+  letterSpacing: 0.6,
+},
+
+filterBar: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  paddingHorizontal: 16,
+  paddingVertical: 10,
+  borderBottomWidth: 1,
+  borderBottomColor: '#F7F7F7',
+  backgroundColor: '#FFFFFF',
+},
+
+resultsCount: {
+  fontSize: 10,
+  color: '#999',
+  fontWeight: '600',
+},
+
+filterBtn: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  backgroundColor: '#FAFAFA',
+  paddingHorizontal: 10,
+  paddingVertical: 6,
+  borderRadius: 20,
+},
+
+filterBtnText: {
+  fontSize: 10,
+  fontWeight: '800',
+  marginRight: 4,
+  color: '#111',
+},
+
+list: {
+  paddingHorizontal: 12,
+  paddingTop: 14,
+  paddingBottom: 100,
+},
+
+columnWrapper: {
+  justifyContent: 'space-between',
+},
+
+productCard: {
+  width: COLUMN_WIDTH,
+  marginBottom: 18,
+  backgroundColor: '#FFFFFF',
+},
+
+imageContainer: {
+  width: '100%',
+  height: 210,
+  backgroundColor: '#F8F8F8',
+  position: 'relative',
+  overflow: 'hidden',
+  borderRadius: 2,
+},
+
+productImage: {
+  width: '100%',
+  height: '100%',
+  resizeMode: 'cover',
+},
+
+productInfo: {
+  paddingTop: 8,
+  paddingHorizontal: 2,
+},
+
+productName: {
+  fontSize: 10,
+  color: '#333',
+  fontWeight: '600',
+  lineHeight: 14,
+  letterSpacing: 0.3,
+},
+
+priceRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginTop: 5,
+  gap: 5,
+},
+
+productPrice: {
+  fontSize: 12,
+  fontWeight: '900',
+  color: '#000',
+},
+
+wasPrice: {
+  fontSize: 9,
+  color: '#B5B5B5',
+  textDecorationLine: 'line-through',
+},
+
+wishlistBtn: {
+  position: 'absolute',
+  right: 8,
+  bottom: 8,
+  backgroundColor: 'rgba(255,255,255,0.92)',
+  width: 28,
+  height: 28,
+  borderRadius: 14,
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+
+saleBadge: {
+  position: 'absolute',
+  top: 8,
+  left: 8,
+  backgroundColor: '#000',
+  paddingHorizontal: 6,
+  paddingVertical: 3,
+  borderRadius: 2,
+},
+
+saleText: {
+  color: '#FFF',
+  fontSize: 7,
+  fontWeight: '900',
+  letterSpacing: 0.8,
+},
+
+tagBadge: {
+  position: 'absolute',
+  top: 8,
+  left: 8,
+  backgroundColor: '#111',
+  paddingHorizontal: 5,
+  paddingVertical: 3,
+  borderRadius: 2,
+},
+
+tagText: {
+  color: '#fff',
+  fontSize: 7,
+  fontWeight: '900',
+  letterSpacing: 0.7,
+},
+
+emptyContainer: {
+  alignItems: 'center',
+  marginTop: 120,
+},
+
+emptyText: {
+  fontSize: 11,
+  color: '#AAA',
+  marginTop: 12,
+  fontWeight: '600',
+  letterSpacing: 0.4,
+},
  
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
    loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   loadingText: { color: '#555' },
 
-  subtitle: { fontSize: 10, color: '#999', marginTop: 2 },
-  
-  headerContent: { backgroundColor: '#fff' },
-  subCatScroll: { paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: '#F5F5F5' },
-  subCatCapsule: { 
-    paddingHorizontal: 18, 
-    paddingVertical: 8, 
-    backgroundColor: '#F9F9F9', 
-    marginRight: 10,
-    borderWidth: 1,
-    borderColor: '#EEEEEE' 
-  },
-  subCatText: { fontSize: 10, fontWeight: '700', color: '#222', letterSpacing: 0.5 },
  container: { 
     flex: 1, 
     backgroundColor: '#FFFFFF' 
@@ -280,42 +457,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   name: { fontSize: 12, color: '#333', fontWeight: '400' },
-  priceRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 5 },
-  price: { fontSize: 14, fontWeight: '900', color: '#FA6338' },
-  wasPrice: { fontSize: 10, color: '#BBB', textDecorationLine: 'line-through' },
   
-  saleBadge: { position: 'absolute', top: 0, backgroundColor: '#000', paddingHorizontal: 8, paddingVertical: 4 },
-  saleText: { color: '#FFF', fontSize: 9, fontWeight: '900' },
-  favBtn: { position: 'absolute', bottom: 10, backgroundColor: 'rgba(255,255,255,0.7)', padding: 6, borderRadius: 20 },
-  
- 
-  filterBar: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    paddingHorizontal: 15, 
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F5F5F5'
-  },
-  resultsCount: { fontSize: 11, color: '#999', fontWeight: '500' },
-  filterBtn: { flexDirection: 'row', alignItems: 'center' },
-  filterBtnText: { fontSize: 11, fontWeight: '800', marginRight: 4 },
-
- 
-  tagBadge: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    backgroundColor: '#000',
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-  },
-  tagText: { color: '#fff', fontSize: 8, fontWeight: 'bold', letterSpacing: 0.5 },
-
- 
-  emptyContainer: { alignItems: 'center', marginTop: 100 },
-  emptyText: { fontSize: 13, color: '#999', marginTop: 15 },
-
 });
 

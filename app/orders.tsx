@@ -5,8 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLanguage } from '@/Contexts/LanguageContext'; 
 import { authClient } from '@/lib/auth-client';
 import { loadMyOrdersLocal, saveMyOrders, isOnline } from '../lib/offline';
-
-const API_URL = "https://brand-gallery-backend.brand-gallery.workers.dev";
+const API_URL = "http://192.168.1.3:8787";
 
 export default function MyOrdersScreen() {
   const { data: session } = authClient.useSession();
@@ -49,7 +48,7 @@ export default function MyOrdersScreen() {
   }, [session?.user?.id]);
 
   // ✅ REMOVED TypeScript type annotation (: string) for JS compatibility
-  const getStatusStyle = (status) => {
+  const getStatusStyle = (status: any) => {
     switch (status?.toLowerCase()) {
       case 'pending': return { color: '#FF9500', bg: '#FFF9E6', label: t('statusPending') || 'PENDING' };
       case 'processing': return { color: '#0052CC', bg: '#E6F0FF', label: t('statusProcessing') || 'PROCESSING' };
@@ -63,10 +62,10 @@ export default function MyOrdersScreen() {
   const dataToShow = expanded ? orders : orders.slice(0, 4);
 
   // ✅ REMOVED TypeScript type annotation ({ item }: { item: any })
-  const renderOrder = ({ item }) => {
+  const renderOrder = ({ item }: any) => {
     const config = getStatusStyle(item.status);
 
-    const toLocalNumbers = (num) => {
+    const toLocalNumbers = (num: any) => {
       const str = Math.round(Number(num || 0)).toLocaleString();
       if (locale === 'en') return str;
       const easternDigits = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];

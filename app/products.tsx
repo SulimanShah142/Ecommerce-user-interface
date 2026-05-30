@@ -8,7 +8,7 @@ import { initOfflineDb, loadProductsLocal, syncRemoteCatalog, isOnline, execSql 
 import { useLanguage } from '@/Contexts/LanguageContext';
 import { authClient } from '@/lib/auth-client';
 
-const API_URL = "https://brand-gallery-backend.brand-gallery.workers.dev";
+const API_URL = "http://192.168.1.3:8787";
 
 export default function ProductsPage() {
   const router = useRouter();
